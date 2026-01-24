@@ -3,6 +3,7 @@ PATH
   specs:
     njtransit (0.1.0)
       faraday (~> 2.0)
+      faraday-multipart (~> 1.0)
       faraday-typhoeus (~> 1.0)
       typhoeus (~> 1.4)
 
@@ -17,6 +18,8 @@ GEM
       faraday-net_http (>= 2.0, < 3.5)
       json
       logger
+    faraday-multipart (1.2.0)
+      multipart-post (~> 2.0)
     faraday-net_http (3.4.2)
       net-http (~> 0.5)
     faraday-typhoeus (1.1.0)
@@ -38,6 +41,7 @@ GEM
     lefthook (1.13.6)
     lint_roller (1.1.0)
     logger (1.7.0)
+    multipart-post (2.4.1)
     net-http (0.9.1)
       uri (>= 0.11.1)
     parallel (1.27.0)

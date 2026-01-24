@@ -2,17 +2,27 @@
 
 require "faraday"
 require "faraday/typhoeus"
+require "faraday/multipart"
 require "json"
+
+require_relative "resources/base"
+require_relative "resources/bus"
 
 module NJTransit
   class Client
-    attr_reader :api_key, :log_level, :base_url, :timeout
+    attr_reader :username, :password, :log_level, :base_url, :timeout
 
-    def initialize(api_key:, log_level: "silent", base_url: Configuration::DEFAULT_BASE_URL, timeout: Configuration::DEFAULT_TIMEOUT)
-      @api_key = api_key
+    def initialize(username:, password:, log_level: "silent", base_url: Configuration::DEFAULT_BASE_URL, timeout: Configuration::DEFAULT_TIMEOUT)
+      @username = username
+      @password = password
       @log_level = log_level
       @base_url = base_url
       @timeout = timeout
+      @token = nil
+    end
+
+    def bus
+      @bus ||= Resources::Bus.new(self)
     end
 
     def get(path, params = {})
@@ -21,6 +31,10 @@ module NJTransit
 
     def post(path, body = {})
       request(:post, path, body)
+    end
+
+    def post_form(path, params = {})
+      request_form(:post, path, params)
     end
 
     def put(path, body = {})
@@ -35,10 +49,31 @@ module NJTransit
       request(:delete, path, params)
     end
 
+    def authenticate!
+      response = form_connection.post("/api/BUSDV2/authenticateUser") do |req|
+        req.body = { username: username, password: password }
+      end
+
+      result = parse_body(response.body)
+
+      raise AuthenticationError, "Authentication failed" unless result.is_a?(Hash) && result["Authenticated"] == "True"
+
+      @token = result["UserToken"]
+    end
+
+    def token
+      authenticate! if @token.nil?
+      @token
+    end
+
+    def clear_token!
+      @token = nil
+    end
+
     private
 
     def request(method, path, params_or_body = {})
-      response = connection.public_send(method) do |req|
+      response = json_connection.public_send(method) do |req|
         req.url(path)
         if %i[get delete].include?(method)
           req.params = params_or_body
@@ -54,8 +89,41 @@ module NJTransit
       raise ConnectionError, e.message
     end
 
-    def connection
-      @connection ||= Faraday.new(url: base_url) do |f|
+    def request_form(method, path, params = {}, retry_auth: true)
+      response = form_connection.public_send(method) do |req|
+        req.url(path)
+        req.body = params
+      end
+
+      result = handle_response(response)
+
+      if token_expired?(result) && retry_auth
+        clear_token!
+        authenticate!
+        params[:token] = @token
+        return request_form(method, path, params, retry_auth: false)
+      end
+
+      check_api_error!(result)
+      result
+    rescue Faraday::TimeoutError => e
+      raise TimeoutError, e.message
+    rescue Faraday::ConnectionFailed => e
+      raise ConnectionError, e.message
+    end
+
+    def token_expired?(result)
+      result.is_a?(Hash) && result["errorMessage"] == "Invalid token."
+    end
+
+    def check_api_error!(result)
+      return unless result.is_a?(Hash) && result["errorMessage"]
+
+      raise APIError, result["errorMessage"]
+    end
+
+    def json_connection
+      @json_connection ||= Faraday.new(url: base_url) do |f|
         f.request :json
         f.response :logger, logger, { headers: log_headers?, bodies: log_bodies? } if logging_enabled?
         f.adapter :typhoeus
@@ -63,14 +131,19 @@ module NJTransit
         f.options.open_timeout = timeout
         f.headers["Content-Type"] = "application/json"
         f.headers["Accept"] = "application/json"
-        configure_auth(f)
       end
     end
 
-    def configure_auth(faraday)
-      # TODO: Configure authentication based on NJTransit API requirements
-      # This will be updated once we review the API documentation
-      faraday.headers["Authorization"] = "Bearer #{api_key}" if api_key
+    def form_connection
+      @form_connection ||= Faraday.new(url: base_url) do |f|
+        f.request :multipart
+        f.request :url_encoded
+        f.response :logger, logger, { headers: log_headers?, bodies: log_bodies? } if logging_enabled?
+        f.adapter :typhoeus
+        f.options.timeout = timeout
+        f.options.open_timeout = timeout
+        f.headers["Accept"] = "text/plain"
+      end
     end
 
     def handle_response(response)
@@ -93,7 +166,7 @@ module NJTransit
     def error_message(response)
       parsed = parse_body(response.body)
       if parsed.is_a?(Hash)
-        parsed["error"] || parsed["message"] || response.body
+        parsed["error"] || parsed["message"] || parsed["errorMessage"] || response.body
       else
         response.body
       end

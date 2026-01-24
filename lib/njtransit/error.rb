@@ -10,6 +10,9 @@ module NJTransit
     end
   end
 
+  # API-level errors (returned in response body)
+  class APIError < Error; end
+
   # Client errors (4xx)
   class ClientError < Error; end
   class BadRequestError < ClientError; end        # 400
