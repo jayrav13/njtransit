@@ -26,3 +26,5 @@ module NJTransit
     end
   end
 end
+
+require_relative "njtransit/railtie" if defined?(Rails::Railtie)
