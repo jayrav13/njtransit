@@ -4,12 +4,7 @@ require_relative "njtransit/version"
 require_relative "njtransit/configuration"
 require_relative "njtransit/error"
 require_relative "njtransit/client"
-require_relative "njtransit/gtfs/database"
-require_relative "njtransit/gtfs/importer"
-require_relative "njtransit/gtfs/models/stop"
-require_relative "njtransit/gtfs/models/route"
-require_relative "njtransit/gtfs/queries/routes_between"
-require_relative "njtransit/gtfs/queries/schedule"
+require_relative "njtransit/gtfs"
 
 module NJTransit
   class << self
