@@ -12,3 +12,6 @@
 
 # Private API documentation (not for distribution)
 /docs/api/
+
+# MCP configuration (contains tokens)
+.mcp.json

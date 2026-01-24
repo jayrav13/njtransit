@@ -20,14 +20,14 @@ module NJTransit
   class ConflictError < ClientError; end          # 409
   class GoneError < ClientError; end              # 410
   class UnprocessableEntityError < ClientError; end # 422
-  class RateLimitError < ClientError; end         # 429
+  class RateLimitError < ClientError; end # 429
 
   # Server errors (5xx)
   class ServerError < Error; end
   class InternalServerError < ServerError; end    # 500
   class BadGatewayError < ServerError; end        # 502
   class ServiceUnavailableError < ServerError; end # 503
-  class GatewayTimeoutError < ServerError; end    # 504
+  class GatewayTimeoutError < ServerError; end # 504
 
   # Connection issues
   class ConnectionError < Error; end

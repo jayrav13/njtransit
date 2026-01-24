@@ -18,9 +18,7 @@ module NJTransit
 
     def log_level=(level)
       level = level.to_s.downcase
-      unless VALID_LOG_LEVELS.include?(level)
-        raise ArgumentError, "Invalid log level: #{level}. Valid levels: #{VALID_LOG_LEVELS.join(", ")}"
-      end
+      raise ArgumentError, "Invalid log level: #{level}. Valid levels: #{VALID_LOG_LEVELS.join(", ")}" unless VALID_LOG_LEVELS.include?(level)
 
       @log_level = level
     end
