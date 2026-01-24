@@ -6,7 +6,7 @@ module NJTransit
     DEFAULT_BASE_URL = "https://pcsdata.njtransit.com"
     DEFAULT_TIMEOUT = 30
 
-    attr_accessor :username, :password, :base_url, :timeout
+    attr_accessor :username, :password, :base_url, :timeout, :gtfs_database_path
     attr_reader :log_level
 
     def initialize
@@ -15,6 +15,7 @@ module NJTransit
       @log_level = ENV.fetch("NJTRANSIT_LOG_LEVEL", "silent")
       @base_url = ENV.fetch("NJTRANSIT_BASE_URL", DEFAULT_BASE_URL)
       @timeout = ENV.fetch("NJTRANSIT_TIMEOUT", DEFAULT_TIMEOUT).to_i
+      @gtfs_database_path = ENV.fetch("NJTRANSIT_GTFS_DATABASE_PATH", nil) || default_gtfs_database_path
     end
 
     def log_level=(level)
@@ -32,6 +33,13 @@ module NJTransit
         base_url: base_url,
         timeout: timeout
       }
+    end
+
+    private
+
+    def default_gtfs_database_path
+      base = ENV["XDG_DATA_HOME"] || File.expand_path("~/.local/share")
+      File.join(base, "njtransit", "gtfs.sqlite3")
     end
   end
 end

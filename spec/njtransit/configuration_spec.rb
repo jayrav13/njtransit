@@ -43,6 +43,40 @@ RSpec.describe NJTransit::Configuration do
     end
   end
 
+  describe "#gtfs_database_path" do
+    it "defaults to XDG_DATA_HOME if set" do
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("NJTRANSIT_GTFS_DATABASE_PATH", anything).and_return(nil)
+      allow(ENV).to receive(:[]).with("XDG_DATA_HOME").and_return("/custom/xdg")
+
+      config = described_class.new
+      expect(config.gtfs_database_path).to eq("/custom/xdg/njtransit/gtfs.sqlite3")
+    end
+
+    it "defaults to ~/.local/share/njtransit when XDG_DATA_HOME not set" do
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("NJTRANSIT_GTFS_DATABASE_PATH", anything).and_return(nil)
+      allow(ENV).to receive(:[]).with("XDG_DATA_HOME").and_return(nil)
+
+      config = described_class.new
+      expect(config.gtfs_database_path).to eq(File.expand_path("~/.local/share/njtransit/gtfs.sqlite3"))
+    end
+
+    it "can be overridden via environment variable" do
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("NJTRANSIT_GTFS_DATABASE_PATH", anything).and_return("/custom/path/gtfs.db")
+
+      config = described_class.new
+      expect(config.gtfs_database_path).to eq("/custom/path/gtfs.db")
+    end
+
+    it "can be set directly" do
+      config = described_class.new
+      config.gtfs_database_path = "/my/path/gtfs.sqlite3"
+      expect(config.gtfs_database_path).to eq("/my/path/gtfs.sqlite3")
+    end
+  end
+
   describe "#to_h" do
     before do
       config.username = "test_user"
