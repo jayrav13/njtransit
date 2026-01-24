@@ -4,6 +4,7 @@ require_relative "njtransit/version"
 require_relative "njtransit/configuration"
 require_relative "njtransit/error"
 require_relative "njtransit/client"
+require_relative "njtransit/gtfs"
 
 module NJTransit
   class << self
@@ -25,3 +26,5 @@ module NJTransit
     end
   end
 end
+
+require_relative "njtransit/railtie" if defined?(Rails::Railtie)

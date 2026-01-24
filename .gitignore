@@ -1,3 +1,5 @@
+.DS_Store
+
 /.bundle/
 /.yardoc
 /_yardoc/
@@ -15,3 +17,7 @@
 
 # MCP configuration (contains tokens)
 .mcp.json
+
+# Environment variables
+.env
+.env.*

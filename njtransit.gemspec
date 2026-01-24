@@ -34,6 +34,9 @@ Gem::Specification.new do |spec|
 
   # Dependencies
   spec.add_dependency "faraday", "~> 2.0"
+  spec.add_dependency "faraday-multipart", "~> 1.0"
   spec.add_dependency "faraday-typhoeus", "~> 1.0"
+  spec.add_dependency "sequel", "~> 5.0"
+  spec.add_dependency "sqlite3", "~> 2.0"
   spec.add_dependency "typhoeus", "~> 1.4"
 end

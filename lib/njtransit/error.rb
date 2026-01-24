@@ -10,6 +10,9 @@ module NJTransit
     end
   end
 
+  # API-level errors (returned in response body)
+  class APIError < Error; end
+
   # Client errors (4xx)
   class ClientError < Error; end
   class BadRequestError < ClientError; end        # 400
@@ -32,4 +35,16 @@ module NJTransit
   # Connection issues
   class ConnectionError < Error; end
   class TimeoutError < ConnectionError; end
+
+  # GTFS not imported
+  class GTFSNotImportedError < Error
+    def initialize(detected_path: nil)
+      message = "GTFS data not found. Run: rake njtransit:gtfs:import[/path/to/bus_data]"
+      if detected_path
+        message += "\n\nDetected GTFS files at: #{detected_path}"
+        message += "\nHint: rake njtransit:gtfs:import[#{detected_path}]"
+      end
+      super(message)
+    end
+  end
 end

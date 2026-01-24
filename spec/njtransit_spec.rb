@@ -12,12 +12,20 @@ RSpec.describe NJTransit do
       expect { |b| described_class.configure(&b) }.to yield_with_args(NJTransit::Configuration)
     end
 
-    it "allows setting api_key" do
+    it "allows setting username" do
       described_class.configure do |config|
-        config.api_key = "test_key"
+        config.username = "test_user"
       end
 
-      expect(described_class.configuration.api_key).to eq("test_key")
+      expect(described_class.configuration.username).to eq("test_user")
+    end
+
+    it "allows setting password" do
+      described_class.configure do |config|
+        config.password = "test_pass"
+      end
+
+      expect(described_class.configuration.password).to eq("test_pass")
     end
 
     it "allows setting log_level" do
@@ -32,7 +40,8 @@ RSpec.describe NJTransit do
   describe ".client" do
     before do
       described_class.configure do |config|
-        config.api_key = "test_key"
+        config.username = "test_user"
+        config.password = "test_pass"
       end
     end
 
@@ -49,7 +58,7 @@ RSpec.describe NJTransit do
 
   describe ".reset!" do
     it "clears configuration and client" do
-      described_class.configure { |c| c.api_key = "test" }
+      described_class.configure { |c| c.username = "test" }
       original_config = described_class.configuration
 
       described_class.reset!

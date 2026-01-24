@@ -1,0 +1,4 @@
+route_id,agency_id,route_short_name,route_long_name,route_type,route_color
+1,NJB,1,Newark - Jersey City,3,000000
+2,NJB,10,Bloomfield - Newark,3,000000
+3,NJB,197,Willowbrook - Port Authority,3,FF0000
