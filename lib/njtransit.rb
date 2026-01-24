@@ -6,6 +6,8 @@ require_relative "njtransit/error"
 require_relative "njtransit/client"
 require_relative "njtransit/gtfs/database"
 require_relative "njtransit/gtfs/importer"
+require_relative "njtransit/gtfs/models/stop"
+require_relative "njtransit/gtfs/models/route"
 
 module NJTransit
   class << self
