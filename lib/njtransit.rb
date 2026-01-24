@@ -8,6 +8,7 @@ require_relative "njtransit/gtfs/database"
 require_relative "njtransit/gtfs/importer"
 require_relative "njtransit/gtfs/models/stop"
 require_relative "njtransit/gtfs/models/route"
+require_relative "njtransit/gtfs/queries/routes_between"
 
 module NJTransit
   class << self
