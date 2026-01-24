@@ -40,7 +40,7 @@ RSpec.describe NJTransit::Resources::Bus do
 
   describe "#stops" do
     it "calls the correct endpoint with required params" do
-      bus.stops(route: "1", direction: "Newark")
+      bus.stops(route: "1", direction: "Newark", enrich: false)
       expect(client).to have_received(:post_form).with(
         "/api/BUSDV2/getStops",
         { token: "test_token", route: "1", direction: "Newark" }
@@ -48,7 +48,7 @@ RSpec.describe NJTransit::Resources::Bus do
     end
 
     it "includes name_contains when provided" do
-      bus.stops(route: "1", direction: "Newark", name_contains: "BROAD")
+      bus.stops(route: "1", direction: "Newark", name_contains: "BROAD", enrich: false)
       expect(client).to have_received(:post_form).with(
         "/api/BUSDV2/getStops",
         { token: "test_token", route: "1", direction: "Newark", namecontains: "BROAD" }
@@ -58,7 +58,7 @@ RSpec.describe NJTransit::Resources::Bus do
 
   describe "#stop_name" do
     it "calls the correct endpoint with stop_number" do
-      bus.stop_name(stop_number: "19159")
+      bus.stop_name(stop_number: "19159", enrich: false)
       expect(client).to have_received(:post_form).with(
         "/api/BUSDV2/getStopName",
         { token: "test_token", stopnum: "19159" }
@@ -78,7 +78,7 @@ RSpec.describe NJTransit::Resources::Bus do
 
   describe "#departures" do
     it "calls the correct endpoint with stop" do
-      bus.departures(stop: "PABT")
+      bus.departures(stop: "PABT", enrich: false)
       expect(client).to have_received(:post_form).with(
         "/api/BUSDV2/getBusDV",
         { token: "test_token", stop: "PABT" }
@@ -86,7 +86,7 @@ RSpec.describe NJTransit::Resources::Bus do
     end
 
     it "includes optional route and direction" do
-      bus.departures(stop: "PABT", route: "164", direction: "Newark")
+      bus.departures(stop: "PABT", route: "164", direction: "Newark", enrich: false)
       expect(client).to have_received(:post_form).with(
         "/api/BUSDV2/getBusDV",
         { token: "test_token", stop: "PABT", route: "164", direction: "Newark" }
@@ -114,7 +114,7 @@ RSpec.describe NJTransit::Resources::Bus do
 
   describe "#stops_nearby" do
     it "calls the correct endpoint with location params" do
-      bus.stops_nearby(lat: 40.737, lon: -74.170, radius: 2000)
+      bus.stops_nearby(lat: 40.737, lon: -74.170, radius: 2000, enrich: false)
       expect(client).to have_received(:post_form).with(
         "/api/BUSDV2/getBusLocationsData",
         { token: "test_token", lat: 40.737, lon: -74.170, radius: 2000, mode: "BUS" }
@@ -122,7 +122,7 @@ RSpec.describe NJTransit::Resources::Bus do
     end
 
     it "includes optional route and direction" do
-      bus.stops_nearby(lat: 40.737, lon: -74.170, radius: 2000, route: "1", direction: "Newark")
+      bus.stops_nearby(lat: 40.737, lon: -74.170, radius: 2000, route: "1", direction: "Newark", enrich: false)
       expect(client).to have_received(:post_form).with(
         "/api/BUSDV2/getBusLocationsData",
         { token: "test_token", lat: 40.737, lon: -74.170, radius: 2000, mode: "BUS", route: "1", direction: "Newark" }
@@ -132,7 +132,7 @@ RSpec.describe NJTransit::Resources::Bus do
 
   describe "#vehicles_nearby" do
     it "calls the correct endpoint with location params" do
-      bus.vehicles_nearby(lat: 40.737, lon: -74.170, radius: 2000)
+      bus.vehicles_nearby(lat: 40.737, lon: -74.170, radius: 2000, enrich: false)
       expect(client).to have_received(:post_form).with(
         "/api/BUSDV2/getVehicleLocations",
         { token: "test_token", lat: 40.737, lon: -74.170, radius: 2000, mode: "BUS" }
