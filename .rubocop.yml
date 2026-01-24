@@ -27,6 +27,7 @@ Layout/LineLength:
 Metrics/ClassLength:
   Exclude:
     - "lib/njtransit/client.rb"
+    - "lib/njtransit/gtfs/database.rb"
 
 Metrics/MethodLength:
   Exclude:
@@ -39,3 +40,8 @@ Metrics/AbcSize:
 Metrics/CyclomaticComplexity:
   Exclude:
     - "lib/njtransit/client.rb"
+
+# GTFS database schema is inherently verbose
+Metrics/ModuleLength:
+  Exclude:
+    - "lib/njtransit/gtfs/database.rb"
