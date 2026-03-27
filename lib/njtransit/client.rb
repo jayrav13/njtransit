@@ -7,22 +7,45 @@ require "json"
 
 require_relative "resources/base"
 require_relative "resources/bus"
+require_relative "resources/rail"
+require_relative "resources/bus_gtfs"
+require_relative "resources/rail_gtfs"
 
 module NJTransit
   class Client
-    attr_reader :username, :password, :log_level, :base_url, :timeout
+    DEFAULT_AUTH_PATH = "/api/BUSDV2/authenticateUser"
 
-    def initialize(username:, password:, log_level: "silent", base_url: Configuration::DEFAULT_BASE_URL, timeout: Configuration::DEFAULT_TIMEOUT)
+    attr_reader :username, :password, :log_level, :base_url, :timeout, :auth_path
+
+    def initialize(username:, password:, log_level: "silent", base_url: Configuration::DEFAULT_BASE_URL,
+                   timeout: Configuration::DEFAULT_TIMEOUT, auth_path: DEFAULT_AUTH_PATH)
       @username = username
       @password = password
       @log_level = log_level
       @base_url = base_url
       @timeout = timeout
+      @auth_path = auth_path
       @token = nil
     end
 
     def bus
       @bus ||= Resources::Bus.new(self)
+    end
+
+    def rail
+      @rail ||= Resources::Rail.new(self)
+    end
+
+    def bus_gtfs
+      @bus_gtfs ||= Resources::BusGTFS.new(self)
+    end
+
+    def bus_gtfs_g2
+      @bus_gtfs_g2 ||= Resources::BusGTFS.new(self, api_prefix: "/api/GTFSG2")
+    end
+
+    def rail_gtfs
+      @rail_gtfs ||= Resources::RailGTFS.new(self)
     end
 
     def get(path, params = {})
@@ -49,8 +72,12 @@ module NJTransit
       request(:delete, path, params)
     end
 
+    def post_form_raw(path, params = {})
+      request_form_raw(:post, path, params)
+    end
+
     def authenticate!
-      response = form_connection.post("/api/BUSDV2/authenticateUser") do |req|
+      response = form_connection.post(auth_path) do |req|
         req.body = { username: username, password: password }
       end
 
@@ -112,6 +139,22 @@ module NJTransit
       raise ConnectionError, e.message
     end
 
+    def request_form_raw(method, path, params = {})
+      params[:token] = token
+      response = raw_connection.public_send(method) do |req|
+        req.url(path)
+        req.body = params
+      end
+
+      raise error_for_status(response.status).new(error_message(response), response: response) unless response.success?
+
+      response.body
+    rescue Faraday::TimeoutError => e
+      raise TimeoutError, e.message
+    rescue Faraday::ConnectionFailed => e
+      raise ConnectionError, e.message
+    end
+
     def token_expired?(result)
       result.is_a?(Hash) && result["errorMessage"] == "Invalid token."
     end
@@ -143,6 +186,17 @@ module NJTransit
         f.options.timeout = timeout
         f.options.open_timeout = timeout
         f.headers["Accept"] = "text/plain"
+      end
+    end
+
+    def raw_connection
+      @raw_connection ||= Faraday.new(url: base_url) do |f|
+        f.request :multipart
+        f.request :url_encoded
+        f.adapter :typhoeus
+        f.options.timeout = timeout
+        f.options.open_timeout = timeout
+        f.headers["Accept"] = "*/*"
       end
     end
 

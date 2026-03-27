@@ -16,13 +16,23 @@ module NJTransit
       @configuration ||= Configuration.new
     end
 
+    # Bus API client (pcsdata.njtransit.com)
     def client
       @client ||= Client.new(**configuration.to_h)
+    end
+
+    # Rail API client (raildata.njtransit.com)
+    def rail_client
+      @rail_client ||= Client.new(
+        **configuration.to_h, base_url: Configuration::DEFAULT_RAIL_BASE_URL,
+                              auth_path: "/api/TrainData/getToken"
+      )
     end
 
     def reset!
       @configuration = nil
       @client = nil
+      @rail_client = nil
     end
   end
 end

@@ -4,6 +4,7 @@ module NJTransit
   class Configuration
     VALID_LOG_LEVELS = %w[silent info debug].freeze
     DEFAULT_BASE_URL = "https://pcsdata.njtransit.com"
+    DEFAULT_RAIL_BASE_URL = "https://raildata.njtransit.com"
     DEFAULT_TIMEOUT = 30
 
     attr_accessor :username, :password, :base_url, :timeout, :gtfs_database_path

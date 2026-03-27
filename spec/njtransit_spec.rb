@@ -56,6 +56,33 @@ RSpec.describe NJTransit do
     end
   end
 
+  describe ".rail_client" do
+    before do
+      described_class.configure do |config|
+        config.username = "test_user"
+        config.password = "test_pass"
+      end
+    end
+
+    after { described_class.reset! }
+
+    it "returns a Client instance" do
+      expect(described_class.rail_client).to be_a(NJTransit::Client)
+    end
+
+    it "uses the rail base URL" do
+      expect(described_class.rail_client.base_url).to eq("https://raildata.njtransit.com")
+    end
+
+    it "uses the rail auth path" do
+      expect(described_class.rail_client.auth_path).to eq("/api/TrainData/getToken")
+    end
+
+    it "memoizes the rail client" do
+      expect(described_class.rail_client).to be(described_class.rail_client)
+    end
+  end
+
   describe ".reset!" do
     it "clears configuration and client" do
       described_class.configure { |c| c.username = "test" }

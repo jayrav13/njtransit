@@ -35,6 +35,30 @@ RSpec.describe NJTransit::Client do
     end
   end
 
+  describe "#rail" do
+    it "returns a Rail resource" do
+      expect(client.rail).to be_a(NJTransit::Resources::Rail)
+    end
+  end
+
+  describe "#bus_gtfs" do
+    it "returns a BusGTFS resource" do
+      expect(client.bus_gtfs).to be_a(NJTransit::Resources::BusGTFS)
+    end
+  end
+
+  describe "#bus_gtfs_g2" do
+    it "returns a BusGTFS resource with G2 prefix" do
+      expect(client.bus_gtfs_g2).to be_a(NJTransit::Resources::BusGTFS)
+    end
+  end
+
+  describe "#rail_gtfs" do
+    it "returns a RailGTFS resource" do
+      expect(client.rail_gtfs).to be_a(NJTransit::Resources::RailGTFS)
+    end
+  end
+
   describe "#authenticate!" do
     let(:success_response) do
       instance_double(Faraday::Response, success?: true, body: '{"Authenticated": "True", "UserToken": "abc123"}')
