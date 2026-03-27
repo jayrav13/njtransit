@@ -8,13 +8,14 @@ module NJTransit
       include BusEnrichment
 
       MODE = "BUS"
+      VALID_MODES = %w[BUS NLR HBLR RL ALL].freeze
 
-      def locations
-        post_form("/api/BUSDV2/getLocations", mode: MODE)
+      def locations(mode: MODE)
+        post_form("/api/BUSDV2/getLocations", mode: validate_mode(mode))
       end
 
-      def routes
-        post_form("/api/BUSDV2/getBusRoutes", mode: MODE)
+      def routes(mode: MODE)
+        post_form("/api/BUSDV2/getBusRoutes", mode: validate_mode(mode))
       end
 
       def directions(route:)
@@ -57,22 +58,33 @@ module NJTransit
         post_form("/api/BUSDV2/getTripStops", params)
       end
 
-      def stops_nearby(lat:, lon:, radius:, enrich: true, **options)
+      def stops_nearby(lat:, lon:, radius:, mode: MODE, enrich: true, **options)
         ensure_gtfs_available! if enrich
-        params = { lat: lat, lon: lon, radius: radius, mode: MODE }
+        params = { lat: lat, lon: lon, radius: radius, mode: validate_mode(mode) }
         params[:route] = options[:route] if options[:route]
         params[:direction] = options[:direction] if options[:direction]
         result = post_form("/api/BUSDV2/getBusLocationsData", params)
         enrich ? enrich_stops_nearby(result) : result
       end
 
-      def vehicles_nearby(lat:, lon:, radius:, enrich: true)
+      def vehicles_nearby(lat:, lon:, radius:, mode: MODE, enrich: true)
         ensure_gtfs_available! if enrich
-        result = post_form("/api/BUSDV2/getVehicleLocations", lat: lat, lon: lon, radius: radius, mode: MODE)
+        result = post_form(
+          "/api/BUSDV2/getVehicleLocations",
+          lat: lat, lon: lon, radius: radius, mode: validate_mode(mode)
+        )
         enrich ? enrich_vehicles(result) : result
       end
 
       private
+
+      def validate_mode(mode)
+        mode = mode.to_s.upcase
+        return mode if VALID_MODES.include?(mode)
+
+        raise ArgumentError,
+              "Invalid mode: #{mode}. Valid modes: #{VALID_MODES.join(", ")}"
+      end
 
       def post_form(path, params = {})
         params[:token] = client.token

@@ -45,6 +45,10 @@ Metrics/CyclomaticComplexity:
   Exclude:
     - "lib/njtransit/client.rb"
 
+Metrics/ParameterLists:
+  Exclude:
+    - "lib/njtransit/resources/bus.rb"
+
 # GTFS database schema is inherently verbose
 Metrics/ModuleLength:
   Exclude:

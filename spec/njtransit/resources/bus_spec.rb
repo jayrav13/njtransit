@@ -16,6 +16,26 @@ RSpec.describe NJTransit::Resources::Bus do
         { token: "test_token", mode: "BUS" }
       )
     end
+
+    it "accepts a custom mode for light rail" do
+      bus.locations(mode: "HBLR")
+      expect(client).to have_received(:post_form).with(
+        "/api/BUSDV2/getLocations",
+        { token: "test_token", mode: "HBLR" }
+      )
+    end
+
+    it "accepts ALL mode" do
+      bus.locations(mode: "ALL")
+      expect(client).to have_received(:post_form).with(
+        "/api/BUSDV2/getLocations",
+        { token: "test_token", mode: "ALL" }
+      )
+    end
+
+    it "raises on invalid mode" do
+      expect { bus.locations(mode: "INVALID") }.to raise_error(ArgumentError, /Invalid mode/)
+    end
   end
 
   describe "#routes" do
@@ -24,6 +44,14 @@ RSpec.describe NJTransit::Resources::Bus do
       expect(client).to have_received(:post_form).with(
         "/api/BUSDV2/getBusRoutes",
         { token: "test_token", mode: "BUS" }
+      )
+    end
+
+    it "accepts a custom mode" do
+      bus.routes(mode: "NLR")
+      expect(client).to have_received(:post_form).with(
+        "/api/BUSDV2/getBusRoutes",
+        { token: "test_token", mode: "NLR" }
       )
     end
   end
@@ -124,10 +152,22 @@ RSpec.describe NJTransit::Resources::Bus do
     end
 
     it "includes optional route and direction" do
-      bus.stops_nearby(lat: 40.737, lon: -74.170, radius: 2000, route: "1", direction: "Newark", enrich: false)
+      bus.stops_nearby(
+        lat: 40.737, lon: -74.170, radius: 2000,
+        route: "1", direction: "Newark", enrich: false
+      )
       expect(client).to have_received(:post_form).with(
         "/api/BUSDV2/getBusLocationsData",
-        { token: "test_token", lat: 40.737, lon: -74.170, radius: 2000, mode: "BUS", route: "1", direction: "Newark" }
+        { token: "test_token", lat: 40.737, lon: -74.170, radius: 2000,
+          mode: "BUS", route: "1", direction: "Newark" }
+      )
+    end
+
+    it "accepts a custom mode for light rail" do
+      bus.stops_nearby(lat: 40.737, lon: -74.170, radius: 2000, mode: "ALL", enrich: false)
+      expect(client).to have_received(:post_form).with(
+        "/api/BUSDV2/getBusLocationsData",
+        { token: "test_token", lat: 40.737, lon: -74.170, radius: 2000, mode: "ALL" }
       )
     end
   end
@@ -138,6 +178,14 @@ RSpec.describe NJTransit::Resources::Bus do
       expect(client).to have_received(:post_form).with(
         "/api/BUSDV2/getVehicleLocations",
         { token: "test_token", lat: 40.737, lon: -74.170, radius: 2000, mode: "BUS" }
+      )
+    end
+
+    it "accepts a custom mode for light rail" do
+      bus.vehicles_nearby(lat: 40.737, lon: -74.170, radius: 2000, mode: "RL", enrich: false)
+      expect(client).to have_received(:post_form).with(
+        "/api/BUSDV2/getVehicleLocations",
+        { token: "test_token", lat: 40.737, lon: -74.170, radius: 2000, mode: "RL" }
       )
     end
   end
