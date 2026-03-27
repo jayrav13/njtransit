@@ -18,6 +18,9 @@
 # MCP configuration (contains tokens)
 .mcp.json
 
+# Built gems
+*.gem
+
 # Environment variables
 .env
 .env.*
