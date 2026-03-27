@@ -1,188 +1,148 @@
 # NJTransit
 
-A developer-friendly Ruby gem for interacting with NJTransit's real-time Bus API and GTFS static data.
+A Ruby gem for NJ Transit's real-time and schedule data — buses, trains, and light rail. Built to be easy to drop into AI agents, chatbots, and creative projects that need live transit data.
 
-## Installation
+## What You Can Do
 
-Add this line to your application's Gemfile:
+- **Real-time departures** — "When is the next bus/train?" with live arrival times and delay status
+- **Train tracking** — GPS positions, speed, and delay info for every active train
+- **Schedule lookups** — Full timetables via GTFS static data, not just the next hour
+- **Stop discovery** — Find nearby stops by coordinates
+- **Route planning** — Find which routes connect two stops
+- **Light rail** — Hudson-Bergen, Newark, and RiverLINE via the same API
+- **GTFS-RT feeds** — Raw protobuf feeds for alerts, trip updates, and vehicle positions
+
+## Quick Start
+
+### 1. Get API Credentials
+
+Register at [developer.njtransit.com](https://developer.njtransit.com/registration) to get a username and password.
+
+### 2. Install
 
 ```ruby
 gem 'njtransit'
 ```
 
-And then execute:
-
-```sh
-bundle install
-```
-
-Or install it yourself as:
-
-```sh
-gem install njtransit
-```
-
-## Usage
-
-### Configuration
+### 3. Configure
 
 ```ruby
+require 'njtransit'
+
 NJTransit.configure do |config|
   config.username = ENV['NJTRANSIT_USERNAME']
   config.password = ENV['NJTRANSIT_PASSWORD']
-  config.log_level = 'info'  # silent (default), info, or debug
 end
-
-client = NJTransit.client
 ```
 
-### Bus API
-
-The Bus API provides real-time data for NJ Transit buses:
+### 4. Start Querying
 
 ```ruby
-# Get all routes
-client.bus.routes
+# Two clients: one for buses/light rail, one for trains
+client = NJTransit.client
+rail_client = NJTransit.rail_client
 
-# Get directions for a route
-client.bus.directions(route: "197")
+# When is the next bus from Port Authority?
+client.bus.departures(stop: "PABT", enrich: false)
 
-# Get stops for a route and direction
-client.bus.stops(route: "197", direction: "New York")
+# Next trains from NY Penn Station
+rail_client.rail.train_schedule_19(station: "NY")
 
-# Get departures from a stop
-client.bus.departures(stop: "WBRK")
+# Where is train #3837 right now?
+rail_client.rail.train_stop_list(train_id: "3837")
 
-# Get nearby stops
-client.bus.stops_nearby(lat: 40.8523, lon: -74.2567, radius: 0.5)
+# What stops are within 2000 feet of me?
+client.bus.stops_nearby(lat: 40.878, lon: -74.221, radius: 2000, enrich: false)
+# radius is in feet
 
-# Get nearby vehicles
-client.bus.vehicles_nearby(lat: 40.8523, lon: -74.2567, radius: 0.5)
+# Light rail routes
+client.bus.routes(mode: "HBLR")  # Hudson-Bergen Light Rail
 ```
+
+## Two Clients, One Gem
+
+NJ Transit splits its API across two hosts. The gem handles this with two clients:
+
+| Client | Host | What it covers |
+|--------|------|----------------|
+| `NJTransit.client` | pcsdata.njtransit.com | Buses, light rail, bus GTFS-RT |
+| `NJTransit.rail_client` | raildata.njtransit.com | Trains, rail GTFS-RT |
+
+Both authenticate automatically. The bus client also supports light rail by passing a `mode` parameter (`HBLR`, `NLR`, `RL`, or `ALL`).
+
+## Capabilities Overview
+
+### Bus & Light Rail (`client.bus`)
+
+Real-time departures, routes, stops, directions, nearby stops/vehicles, and trip tracking. Most methods accept an `enrich` flag — set `enrich: false` if you haven't imported GTFS static data.
+
+### Rail (`rail_client.rail`)
+
+Train schedules (real-time and full-day), station alerts and delay messages, train stop lists, and live vehicle positions for every active train.
 
 ### GTFS Static Data
 
-GTFS (General Transit Feed Specification) data provides complete schedule and stop information. This data complements the real-time API with:
-
-- Stop coordinates (lat/lon)
-- Route discovery (find all routes between two stops)
-- Full day schedules (not just the next hour)
-
-#### Importing GTFS Data
-
-GTFS data must be imported before use. This is typically done during deployment:
+Full offline schedules imported into a local SQLite database. Useful for answering "what's the schedule tomorrow?" when the real-time API only shows the next hour.
 
 ```ruby
-# Via Ruby
+# Import once
 NJTransit::GTFS.import("/path/to/gtfs/data")
 
-# Check import status
-NJTransit::GTFS.status
-# => { imported: true, routes: 261, stops: 16594, ... }
-```
-
-Or via Rake tasks:
-
-```bash
-# Import GTFS data
-rake njtransit:gtfs:import[/path/to/gtfs/data]
-
-# Check status
-rake njtransit:gtfs:status
-
-# Clear database
-rake njtransit:gtfs:clear
-```
-
-For non-Rails apps, add to your Rakefile:
-
-```ruby
-require 'njtransit/tasks'
-```
-
-#### Querying GTFS Data
-
-```ruby
+# Then query
 gtfs = NJTransit::GTFS.new
-
-# Find stops
-gtfs.stops.all
-gtfs.stops.find_by_code("WBRK")
-# => Stop with lat: 40.8523, lon: -74.2567
-
-# Find routes
-gtfs.routes.all
-gtfs.routes.find("197")
-
-# Find routes between two stops
+gtfs.schedule(route: "191", stop: "27005", date: Date.new(2026, 3, 28))
 gtfs.routes_between(from: "WBRK", to: "PABT")
-# => ["194", "197", "198"]
-
-# Get full day schedule
-gtfs.schedule(route: "197", stop: "WBRK", date: Date.today)
-# => [{ trip_id: "...", arrival_time: "06:00:00", ... }, ...]
 ```
 
-### Automatic Enrichment
+Rake tasks are also available: `rake njtransit:gtfs:import`, `rake njtransit:gtfs:status`, `rake njtransit:gtfs:clear`.
 
-By default, Bus API responses are automatically enriched with GTFS data:
+### GTFS-RT Feeds
+
+Raw protobuf feeds for real-time alerts, trip updates, and vehicle positions:
 
 ```ruby
-# Stops include lat/lon from GTFS
-client.bus.stops(route: "197", direction: "New York")
-# => [{ "stop_id" => "WBRK", "stop_lat" => 40.8523, "stop_lon" => -74.2567, ... }]
-
-# Departures include route long name
-client.bus.departures(stop: "WBRK")
-# => [{ "route" => "197", "route_long_name" => "Willowbrook - Port Authority", ... }]
+client.bus_gtfs.alerts            # Bus alerts
+client.bus_gtfs.vehicle_positions # Bus vehicle positions
+rail_client.rail_gtfs.trip_updates # Rail trip updates
 ```
 
-To disable enrichment (e.g., if GTFS isn't imported):
+A newer G2 version of the bus feeds is also available via `client.bus_gtfs_g2`.
 
-```ruby
-client.bus.stops(route: "197", direction: "New York", enrich: false)
+## Using with Claude Code
+
+If you have [Claude Code](https://claude.ai/code) installed, the `/njtransit` skill lets you ask transit questions directly from your terminal:
+
+```
+/njtransit when is the next train from NY Penn to Trenton?
+/njtransit what buses stop near 40.878, -74.221?
+/njtransit is the Northeast Corridor delayed?
 ```
 
-### Environment Variables
+Claude writes and runs Ruby code against the gem to answer your question. It's a good way to explore what the API can do without writing code yourself.
+
+## Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `NJTRANSIT_USERNAME` | API username | `nil` |
-| `NJTRANSIT_PASSWORD` | API password | `nil` |
-| `NJTRANSIT_LOG_LEVEL` | Logging verbosity | `silent` |
-| `NJTRANSIT_BASE_URL` | API base URL | `https://pcsdata.njtransit.com` |
-| `NJTRANSIT_TIMEOUT` | Request timeout in seconds | `30` |
+| `NJTRANSIT_USERNAME` | API username | — |
+| `NJTRANSIT_PASSWORD` | API password | — |
+| `NJTRANSIT_LOG_LEVEL` | `silent`, `info`, or `debug` | `silent` |
+| `NJTRANSIT_BASE_URL` | Bus API base URL | `https://pcsdata.njtransit.com` |
+| `NJTRANSIT_TIMEOUT` | Request timeout (seconds) | `30` |
 | `NJTRANSIT_GTFS_DATABASE_PATH` | SQLite database path | `~/.local/share/njtransit/gtfs.sqlite3` |
-
-### Error Handling
-
-```ruby
-begin
-  client.bus.stops(route: "197", direction: "New York")
-rescue NJTransit::GTFSNotImportedError => e
-  puts "GTFS not imported: #{e.message}"
-  # Or use enrich: false to skip GTFS
-rescue NJTransit::AuthenticationError => e
-  puts "Invalid credentials"
-rescue NJTransit::RateLimitError => e
-  puts "Rate limited, try again later"
-rescue NJTransit::Error => e
-  puts "Something went wrong: #{e.message}"
-end
-```
 
 ## Development
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `bundle exec rspec` to run the tests. You can also run `bin/console` for an interactive prompt.
+```sh
+bin/setup          # Install dependencies
+bundle exec rspec  # Run tests (153 specs)
+bin/console        # Interactive prompt
+```
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/jayrav13/njtransit. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [code of conduct](https://github.com/jayrav13/njtransit/blob/main/CODE_OF_CONDUCT.md).
+Bug reports and pull requests are welcome at [github.com/jayrav13/njtransit](https://github.com/jayrav13/njtransit).
 
 ## License
 
-The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
-
-## Code of Conduct
-
-Everyone interacting in the NJTransit project's codebases, issue trackers, chat rooms and mailing lists is expected to follow the [code of conduct](https://github.com/jayrav13/njtransit/blob/main/CODE_OF_CONDUCT.md).
+MIT — see [LICENSE](https://opensource.org/licenses/MIT).

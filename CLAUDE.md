@@ -2,6 +2,48 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Architecture
+
+### Two Clients
+
+The gem wraps two separate NJ Transit API hosts with a single `Client` class:
+
+- **`NJTransit.client`** → `pcsdata.njtransit.com` — Bus, light rail, bus GTFS-RT
+- **`NJTransit.rail_client`** → `raildata.njtransit.com` — Rail/train, rail GTFS-RT
+
+Both use the same `Client` class with different `base_url` and `auth_path`. Authentication is token-based and handled automatically (with transparent re-auth on token expiry).
+
+### Resource Classes (`lib/njtransit/resources/`)
+
+- `Bus` — real-time bus/light rail API (departures, routes, stops, vehicles)
+- `Rail` — real-time rail API (schedules, station messages, vehicle tracking)
+- `BusGTFS` — bus GTFS-RT feeds (protobuf). Also used for G2 feeds via `api_prefix` param
+- `RailGTFS` — rail GTFS-RT feeds (protobuf)
+
+### GTFS Static Layer (`lib/njtransit/gtfs/`)
+
+SQLite-backed offline schedule data. Import from GTFS zip, then query via `NJTransit::GTFS.new`:
+- `Database` — Sequel SQLite connection and schema
+- `Importer` — parses GTFS txt files into SQLite
+- `Models` — `Stop`, `Route`
+- `Queries` — `RoutesBetween`, `Schedule`
+
+### Key Patterns
+
+- **`enrich` flag**: Bus API methods default to `enrich: true`, which joins GTFS static data (lat/lon, route names). Use `enrich: false` if GTFS isn't imported or you don't need it.
+- **`mode` parameter**: Bus methods default to `mode: "BUS"`. Pass `"HBLR"`, `"NLR"`, `"RL"`, or `"ALL"` for light rail.
+- **`stops_nearby` radius**: The radius parameter is in **feet**, not miles.
+- **Raw responses**: GTFS-RT methods (`bus_gtfs`, `rail_gtfs`) return binary protobuf data via `post_form_raw`.
+
+## Testing
+
+```bash
+bundle exec rspec              # Run all 153 specs
+bundle exec rspec spec/file.rb # Run a specific spec file
+```
+
+All API calls are stubbed — no credentials needed for tests.
+
 ## Development Workflow
 
 ### Complete Issue-to-Deploy Workflow
