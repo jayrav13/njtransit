@@ -3,6 +3,8 @@
 RSpec.describe NJTransit::Client do
   let(:client) { described_class.new(username: "test_user", password: "test_pass") }
 
+  before { described_class.clear_token_cache! }
+
   describe "#initialize" do
     it "sets username" do
       expect(client.username).to eq("test_user")
@@ -94,6 +96,38 @@ RSpec.describe NJTransit::Client do
         expect { client.authenticate! }.to raise_error(NJTransit::AuthenticationError, "Authentication failed")
       end
     end
+
+    context "when rate limited" do
+      before do
+        body = '{"errorMessage":"Daily usage limit:10. Your current daily usage: 11"}'
+        response = instance_double(Faraday::Response, success?: true, body: body)
+        allow(connection).to receive(:post).and_yield(double(body: nil).as_null_object).and_return(response)
+      end
+
+      it "raises AuthenticationError with the API error message" do
+        expect { client.authenticate! }.to raise_error(
+          NJTransit::AuthenticationError,
+          "Daily usage limit:10. Your current daily usage: 11"
+        )
+      end
+    end
+
+    context "when token is cached" do
+      before do
+        allow(connection).to receive(:post).and_yield(double(body: nil).as_null_object).and_return(success_response)
+        client.authenticate!
+      end
+
+      it "reuses cached token for new client with same base_url" do
+        new_client = described_class.new(username: "test_user", password: "test_pass")
+        allow(new_client).to receive(:form_connection).and_return(connection)
+
+        new_client.authenticate!
+
+        expect(connection).to have_received(:post).once
+        expect(new_client.token).to eq("abc123")
+      end
+    end
   end
 
   describe "#token" do
@@ -109,6 +143,12 @@ RSpec.describe NJTransit::Client do
       client.instance_variable_set(:@token, "existing_token")
       client.clear_token!
       expect(client.instance_variable_get(:@token)).to be_nil
+    end
+
+    it "clears the token cache for that base_url" do
+      described_class.token_cache[client.base_url] = "cached_token"
+      client.clear_token!
+      expect(described_class.token_cache[client.base_url]).to be_nil
     end
   end
 end
