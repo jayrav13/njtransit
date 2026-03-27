@@ -77,15 +77,26 @@ module NJTransit
     end
 
     def authenticate!
+      cached = self.class.token_cache[base_url]
+      if cached
+        @token = cached
+        return @token
+      end
+
       response = form_connection.post(auth_path) do |req|
         req.body = { username: username, password: password }
       end
 
       result = parse_body(response.body)
 
-      raise AuthenticationError, "Authentication failed" unless result.is_a?(Hash) && result["Authenticated"] == "True"
+      unless result.is_a?(Hash) && result["Authenticated"] == "True"
+        message = result.is_a?(Hash) && result["errorMessage"] ? result["errorMessage"] : "Authentication failed"
+        raise AuthenticationError, message
+      end
 
       @token = result["UserToken"]
+      self.class.token_cache[base_url] = @token
+      @token
     end
 
     def token
@@ -95,6 +106,15 @@ module NJTransit
 
     def clear_token!
       @token = nil
+      self.class.token_cache.delete(base_url)
+    end
+
+    def self.token_cache
+      @token_cache ||= {}
+    end
+
+    def self.clear_token_cache!
+      @token_cache = {}
     end
 
     private
