@@ -1,5 +1,7 @@
 # NJTransit
 
+[![Gem Version](https://badge.fury.io/rb/njtransit.svg)](https://badge.fury.io/rb/njtransit)
+
 A Ruby gem for NJ Transit's real-time and schedule data — buses, trains, and light rail. Built to be easy to drop into AI agents, chatbots, and creative projects that need live transit data.
 
 ## What You Can Do
