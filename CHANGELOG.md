@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-03-27
+
+### Fixed
+
+- Switch release workflow to Trusted Publishing (OIDC) for RubyGems authentication
+
 ## [1.0.0] - 2026-03-27
 
 ### Added
