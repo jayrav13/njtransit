@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-03-27
+
+### Added
+
+- `bin/release-watch` — monitors release workflow and confirms gem is live on RubyGems
+
+### Changed
+
+- Updated CLAUDE.md step 8 to use `bin/release-watch`
+- Updated README.md with CI and release tooling documentation
+
 ## [1.0.1] - 2026-03-27
 
 ### Fixed

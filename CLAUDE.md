@@ -141,10 +141,20 @@ gh pr merge <pr-number> --merge
 If version was bumped, a release workflow runs automatically on merge to main:
 1. Runs the test suite
 2. Builds the gem
-3. Publishes to RubyGems
+3. Publishes to RubyGems (via Trusted Publishing / OIDC)
 4. Creates a GitHub release with the gem attached
 
-Monitor with: `gh run watch` (select the Release workflow). Confirm gem was published to rubygems.org.
+```bash
+bin/release-watch                # Check once
+bin/release-watch --poll         # Poll every 15s until done
+bin/release-watch --poll 30      # Poll every 30s
+```
+
+Exit codes: `0` = gem published, `1` = workflow failed, `2` = still in progress.
+
+- **Exit 0**: gem is live on RubyGems — proceed to cleanup
+- **Exit 1**: investigate failure, propose fix — do NOT delete branch
+- **Exit 2**: check again later
 
 ### 9. Cleanup (only after release is healthy)
 

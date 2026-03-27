@@ -135,8 +135,19 @@ Claude writes and runs Ruby code against the gem to answer your question. It's a
 
 ```sh
 bin/setup          # Install dependencies
-bundle exec rspec  # Run tests (153 specs)
+bundle exec rspec  # Run tests
 bin/console        # Interactive prompt
+```
+
+### CI & Release
+
+CI runs automatically on pull requests (RuboCop + RSpec on Ruby 3.2/3.3). Merging to main with a version bump triggers the release workflow, which publishes to RubyGems via Trusted Publishing and creates a GitHub release.
+
+```sh
+bin/ci-watch <pr-number>         # Check CI status for a PR
+bin/ci-watch <pr-number> --poll  # Poll until CI completes
+bin/release-watch                # Check release workflow status
+bin/release-watch --poll         # Poll until gem is published
 ```
 
 ## Contributing
