@@ -46,8 +46,9 @@ module NJTransit
         end
 
         def route_fields(row)
-          { route_id: row["route_id"], agency_id: row["agency_id"], route_short_name: row["route_short_name"],
-            route_long_name: row["route_long_name"], route_type: row["route_type"]&.to_i, route_color: row["route_color"] }
+          { route_id: row["route_id"], agency_id: row["agency_id"],
+            route_short_name: row["route_short_name"], route_long_name: row["route_long_name"],
+            route_type: row["route_type"]&.to_i, route_color: row["route_color"] }
         end
 
         def stop_fields(row)

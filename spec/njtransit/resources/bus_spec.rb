@@ -104,10 +104,12 @@ RSpec.describe NJTransit::Resources::Bus do
     end
 
     it "includes optional timing_point_id" do
-      bus.trip_stops(internal_trip_number: "19624134", sched_dep_time: "6/22/2023 12:50:00 AM", timing_point_id: "NWYKPABT")
+      bus.trip_stops(internal_trip_number: "19624134", sched_dep_time: "6/22/2023 12:50:00 AM",
+                     timing_point_id: "NWYKPABT")
       expect(client).to have_received(:post_form).with(
         "/api/BUSDV2/getTripStops",
-        { token: "test_token", internal_trip_number: "19624134", sched_dep_time: "6/22/2023 12:50:00 AM", timing_point_id: "NWYKPABT" }
+        { token: "test_token", internal_trip_number: "19624134", sched_dep_time: "6/22/2023 12:50:00 AM",
+          timing_point_id: "NWYKPABT" }
       )
     end
   end

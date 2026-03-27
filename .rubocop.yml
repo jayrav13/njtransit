@@ -1,3 +1,6 @@
+plugins:
+  - rubocop-rspec
+
 AllCops:
   TargetRubyVersion: 3.2
   NewCops: enable
@@ -15,14 +18,14 @@ Style/Documentation:
 Style/CommentedKeyword:
   Enabled: false
 
+Layout/LineLength:
+  Max: 120
+
 Metrics/BlockLength:
   Exclude:
     - "spec/**/*"
     - "*.gemspec"
     - "lib/njtransit/tasks.rb"
-
-Layout/LineLength:
-  Max: 180
 
 # HTTP client code tends to have longer classes/methods
 Metrics/ClassLength:
@@ -46,3 +49,31 @@ Metrics/CyclomaticComplexity:
 Metrics/ModuleLength:
   Exclude:
     - "lib/njtransit/gtfs/database.rb"
+
+# RSpec cops — relax rules that fight gem test conventions
+RSpec/SpecFilePathFormat:
+  Enabled: false
+
+RSpec/MultipleExpectations:
+  Max: 4
+
+RSpec/ExampleLength:
+  Max: 10
+
+RSpec/MultipleDescribes:
+  Enabled: false
+
+RSpec/BeforeAfterAll:
+  Enabled: false
+
+RSpec/DescribeClass:
+  Enabled: false
+
+RSpec/VerifiedDoubles:
+  Enabled: false
+
+RSpec/IdenticalEqualityAssertion:
+  Enabled: false
+
+RSpec/ScatteredLet:
+  Enabled: false

@@ -11,6 +11,7 @@ pre-commit:
       stage_fixed: true
 
 pre-push:
+  parallel: true
   commands:
     rspec:
       run: bundle exec rspec

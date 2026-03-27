@@ -9,7 +9,8 @@ Gem::Specification.new do |spec|
   spec.email = ["jayrav13@gmail.com"]
 
   spec.summary = "Ruby client for the NJTransit API"
-  spec.description = "A developer-friendly Ruby gem for interacting with NJTransit's API. Provides access to stations, routes, schedules, real-time arrivals, and more."
+  spec.description = "A developer-friendly Ruby gem for interacting with NJTransit's API. " \
+                     "Provides access to stations, routes, schedules, real-time arrivals, and more."
   spec.homepage = "https://github.com/jayrav13/njtransit"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.2.0"
