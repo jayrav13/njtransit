@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Checks GitHub Actions CI status for a PR.
+# Usage: bin/ci-watch <pr-number> [--poll [interval]]
+#
+# Exit codes:
+#   0 — all checks passed
+#   1 — one or more checks failed
+#   2 — checks still in progress (single-check mode only)
+
+if [ $# -lt 1 ]; then
+  echo "Usage: bin/ci-watch <pr-number> [--poll [interval]]" >&2
+  exit 1
+fi
+
+PR_NUMBER="$1"
+shift
+
+POLL=false
+INTERVAL=10
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --poll)
+      POLL=true
+      if [ $# -ge 2 ] && [[ "$2" =~ ^[0-9]+$ ]]; then
+        INTERVAL="$2"
+        shift
+      fi
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+check_once() {
+  OUTPUT=$(gh pr checks "$PR_NUMBER" 2>&1) && {
+    echo "$OUTPUT"
+    echo ""
+    echo "All checks passed."
+    return 0
+  }
+
+  if echo "$OUTPUT" | grep -qE '\bpending\b|\bin_progress\b'; then
+    echo "$OUTPUT"
+    echo ""
+    echo "Checks still running."
+    return 2
+  else
+    echo "$OUTPUT"
+    echo ""
+    echo "CI failed."
+    return 1
+  fi
+}
+
+if [ "$POLL" = true ]; then
+  echo "Watching CI checks for PR #${PR_NUMBER} (polling every ${INTERVAL}s)..."
+  while true; do
+    rc=0
+    check_once || rc=$?
+    if [ "$rc" -eq 2 ]; then
+      echo "Polling again in ${INTERVAL}s..."
+      echo "---"
+      sleep "$INTERVAL"
+    else
+      exit "$rc"
+    fi
+  done
+else
+  rc=0
+  check_once || rc=$?
+  exit "$rc"
+fi
