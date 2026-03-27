@@ -44,107 +44,109 @@ bundle exec rspec spec/file.rb # Run a specific spec file
 
 All API calls are stubbed — no credentials needed for tests.
 
-## Development Workflow
+## Git Workflow
 
-### Complete Issue-to-Deploy Workflow
+Every change follows this process: Issue -> Branch -> Implement -> Commit -> PR -> CI -> Merge -> Release -> Cleanup.
 
-**Every change follows this workflow, even small/transient fixes:**
+### 1. Create Issue
 
+- Create a GitHub issue describing the work
+- Add the `claude` label to issues created by Claude
+- For human-created issues: add `claude:reviewed` label after reviewing (not both labels on same issue)
+- Include a **Success Criteria** section with testable checkbox items:
+  ```markdown
+  ## Success Criteria
+  - [ ] Feature X works as described
+  - [ ] All existing tests pass
+  - [ ] New tests added for feature X
+  ```
+- Note `*Co-authored by Claude*` if applicable
+
+### 2. Create Branch
+
+Branch naming convention:
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  1. CREATE ISSUE (if not exists)                                            │
-│     - Add `claude` label                                                    │
-│     - Include Success Criteria checkboxes                                   │
-│     - Note: "*Co-authored by Claude*"                                       │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  2. CREATE BRANCH                                                           │
-│     - Format: fix/<issue-number>-<brief-description>                        │
-│     - Checkout the new branch                                               │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  3. IMPLEMENT                                                               │
-│     - Write code, tests                                                     │
-│     - Update issue checkboxes as criteria are met                           │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  4. COMMIT                                                                  │
-│     - Include "Closes #<issue-number>" in commit body                       │
-│     - Include "Co-Authored-By: Claude <noreply@anthropic.com>"              │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  5. PUSH BRANCH                                                             │
-│     - Push to origin                                                        │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  6. CREATE PR                                                               │
-│     - Use GitHub MCP (mcp__github__create_pull_request)                     │
-│     - Include "*Co-authored by Claude*" in body                             │
-│     - Always use merge commits (not squash)                                 │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  7. WAIT FOR MERGE                                                          │
-│     - User reviews and merges, OR                                           │
-│     - User gives green light for Claude to merge via GitHub MCP             │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  8. CLEANUP (after user confirms deployment is healthy or N/A)              │
-│     - git checkout main                                                     │
-│     - git pull origin main                                                  │
-│     - git branch -d <branch-name>                                           │
-│     - Delete remote branch via GitHub MCP or git push origin --delete       │
-│     - git fetch --prune                                                     │
-│                                                                             │
-│     ⚠️  DO NOT delete branch if deployment failed - may need to push fixes  │
-└─────────────────────────────────────────────────────────────────────────────┘
+fix/<issue-number>-<brief-description>
 ```
-
-**Note:** This repo does not have DigitalOcean deployment monitoring. After PR is merged, ask user for green light before branch cleanup.
-
-### GitHub Issue Requirements
-
-**Creating Issues (Claude):**
-- Always add the `claude` label
-- Note co-authorship in the issue body: `*Co-authored by Claude*`
-- Include a **Success Criteria** section with checkbox items
-
-**Reviewing Issues (Human-created):**
-- Issues without `claude` or `claude:reviewed` labels are human-created
-- After reading, add the `claude:reviewed` label
-- Never add both `claude` and `claude:reviewed` to the same issue
-
-### Success Criteria
-
-**Every issue should have a Success Criteria section** with testable checkbox items:
-
-```markdown
-## Success Criteria
-
-- [ ] Feature X works as described
-- [ ] All existing tests pass
-- [ ] New tests added for feature X
-```
-
-### Branch Naming Convention
-
-Format: `fix/<issue-number>-<brief-description>`
 
 Examples:
 - `fix/15-add-schedule-parsing`
 - `fix/23-fix-departure-times`
 
-### Commit Requirements
+### 3. Implement
 
-**Auto-close issues:** Include `Closes #<issue-number>` in the commit message body.
+- Write code and tests
+- Update issue checkboxes as criteria are met
+- Bump version in `lib/njtransit/version.rb`
+- Add entry to `CHANGELOG.md` under `[Unreleased]`
 
-**Co-authorship:** All commits must include:
+**Every PR must include** a version bump and changelog entry. Dependabot PRs are exempt.
+
+Follow [Semantic Versioning](https://semver.org/):
+- **PATCH** (0.0.x): Bug fixes, minor doc updates
+- **MINOR** (0.x.0): New features, new API methods
+- **MAJOR** (x.0.0): Breaking changes to public API
+
+### 4. Commit
+
+Every commit must include:
+- `Closes #<issue-number>` in the commit message body
+- Co-authorship footer:
+  ```
+  Co-Authored-By: Claude <noreply@anthropic.com>
+  ```
+
+Example:
 ```
+Add user authentication with Devise
+
+Closes #12
+
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
-### Pull Request Requirements
+### 5. Push & Create PR
 
-- Use GitHub MCP (`mcp__github__create_pull_request`) to create PRs
-- Use GitHub MCP (`mcp__github__merge_pull_request`) to merge when given green light
-- Include co-authorship note in PR body: `*Co-authored by Claude*`
-- **Always use merge commits** (squash merge is disabled)
+- Push branch to origin
+- Create PR using `gh pr create`
+- Include `*Co-authored by Claude*` in PR body
+- Always use **merge commits** (not squash)
 
-### Branch Cleanup
+### 6. Monitor CI
 
-**Only perform after user confirms deployment is healthy (or N/A):**
+```bash
+bin/ci-watch <pr-number>              # Check once
+bin/ci-watch <pr-number> --poll       # Poll every 10s until done
+bin/ci-watch <pr-number> --poll 30    # Poll every 30s
+```
+
+Exit codes: `0` = all passed, `1` = failed, `2` = still in progress.
+
+- **Exit 0**: notify user and await instruction to merge
+- **Exit 1**: investigate the failure, propose a fix — do NOT merge
+- **Exit 2**: check again later
+
+Do NOT merge the PR automatically. Wait for explicit user instruction.
+
+### 7. Merge PR
+
+After CI passes and user gives explicit instruction:
+
+```bash
+gh pr merge <pr-number> --merge
+```
+
+### 8. Monitor Release
+
+If version was bumped, a release workflow runs automatically on merge to main:
+1. Runs the test suite
+2. Builds the gem
+3. Publishes to RubyGems
+4. Creates a GitHub release with the gem attached
+
+Monitor with: `gh run watch` (select the Release workflow). Confirm gem was published to rubygems.org.
+
+### 9. Cleanup (only after release is healthy)
 
 ```bash
 git checkout main
@@ -153,3 +155,5 @@ git branch -d <branch-name>
 git push origin --delete <branch-name>
 git fetch --prune
 ```
+
+Do NOT delete the branch if the release failed — it may be needed for fixes.
