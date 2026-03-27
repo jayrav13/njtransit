@@ -12,6 +12,6 @@ gem "rspec", "~> 3.0"
 gem "rubocop", "~> 1.21"
 gem "rubocop-rspec", "~> 3.0", require: false
 
-gem "lefthook", "~> 1.0", require: false
+gem "lefthook", "~> 2.1", require: false
 
 gem "dotenv", "~> 3.0", require: false
