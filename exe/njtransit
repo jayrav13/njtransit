@@ -9,14 +9,7 @@ SKILL_DEST = File.join(Dir.home, ".claude", "commands", "njtransit.md")
 
 case ARGV[0]
 when "install-skill"
-  dest_dir = File.dirname(SKILL_DEST)
-  Dir.mkdir(dest_dir) unless Dir.exist?(dest_dir)
-
-  # Create ~/.claude if needed
-  claude_dir = File.join(Dir.home, ".claude")
-  Dir.mkdir(claude_dir) unless Dir.exist?(claude_dir)
-  Dir.mkdir(dest_dir) unless Dir.exist?(dest_dir)
-
+  FileUtils.mkdir_p(File.dirname(SKILL_DEST))
   FileUtils.cp(SKILL_SOURCE, SKILL_DEST)
   puts "Installed /njtransit skill to #{SKILL_DEST}"
   puts ""
