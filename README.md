@@ -112,7 +112,14 @@ A newer G2 version of the bus feeds is also available via `client.bus_gtfs_g2`.
 
 ## Using with Claude Code
 
-If you have [Claude Code](https://claude.ai/code) installed, the `/njtransit` skill lets you ask transit questions directly from your terminal:
+Install the gem, then run the skill installer:
+
+```sh
+gem install njtransit
+njtransit install-skill
+```
+
+This adds a `/njtransit` slash command to [Claude Code](https://claude.ai/code) (CLI, desktop app, and IDE extensions). Then ask transit questions from any session:
 
 ```
 /njtransit when is the next train from NY Penn to Trenton?
@@ -120,7 +127,11 @@ If you have [Claude Code](https://claude.ai/code) installed, the `/njtransit` sk
 /njtransit is the Northeast Corridor delayed?
 ```
 
-Claude writes and runs Ruby code against the gem to answer your question. It's a good way to explore what the API can do without writing code yourself.
+Claude writes and runs Ruby code against the gem to answer your question. To remove the skill:
+
+```sh
+njtransit uninstall-skill
+```
 
 ## Environment Variables
 

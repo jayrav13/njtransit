@@ -1,0 +1,39 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "fileutils"
+require_relative "../lib/njtransit/version"
+
+SKILL_SOURCE = File.expand_path("../lib/njtransit/skill.md", __dir__)
+SKILL_DEST = File.join(Dir.home, ".claude", "commands", "njtransit.md")
+
+case ARGV[0]
+when "install-skill"
+  FileUtils.mkdir_p(File.dirname(SKILL_DEST))
+  FileUtils.cp(SKILL_SOURCE, SKILL_DEST)
+  puts "Installed /njtransit skill to #{SKILL_DEST}"
+  puts ""
+  puts "You can now use /njtransit in any Claude Code session."
+  puts ""
+  puts "Make sure NJTRANSIT_USERNAME and NJTRANSIT_PASSWORD are set"
+  puts "in your environment. Register at https://developer.njtransit.com/registration"
+
+when "uninstall-skill"
+  if File.exist?(SKILL_DEST)
+    File.delete(SKILL_DEST)
+    puts "Removed /njtransit skill from #{SKILL_DEST}"
+  else
+    puts "No skill installed at #{SKILL_DEST}"
+  end
+
+when "version", "--version", "-v"
+  puts "njtransit #{NJTransit::VERSION}"
+
+else
+  puts "njtransit v#{NJTransit::VERSION}"
+  puts ""
+  puts "Commands:"
+  puts "  njtransit install-skill     Install /njtransit slash command for Claude Code"
+  puts "  njtransit uninstall-skill   Remove the Claude Code slash command"
+  puts "  njtransit version           Show version"
+end

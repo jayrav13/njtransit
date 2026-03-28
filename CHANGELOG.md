@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-03-27
+
+### Added
+
+- `njtransit install-skill` CLI command to install `/njtransit` slash command for Claude Code
+- `njtransit uninstall-skill` to remove it
+- Skill works across Claude Code CLI, desktop app, and IDE extensions
+
 ## [1.0.2] - 2026-03-27
 
 ### Added
