@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-04-26
+
+### Changed
+
+- Release workflow now runs RuboCop in addition to RSpec before publishing the gem
+
 ## [1.1.3] - 2026-04-26
 
 ### Added
