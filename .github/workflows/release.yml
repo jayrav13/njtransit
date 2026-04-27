@@ -26,6 +26,9 @@ jobs:
       - name: Run tests
         run: bundle exec rspec
 
+      - name: Run linter
+        run: bundle exec rubocop --parallel -f github
+
       - name: Extract version
         id: version
         run: |
