@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-04-26
+
+### Changed
+
+- CI test matrix now includes Ruby 3.4 alongside 3.2 and 3.3
+
+### Fixed
+
+- Declare `csv` as a runtime dependency (no longer a default gem in Ruby 3.4)
+
 ## [1.1.1] - 2026-04-26
 
 ### Fixed
