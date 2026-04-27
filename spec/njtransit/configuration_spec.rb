@@ -4,6 +4,12 @@ RSpec.describe NJTransit::Configuration do
   let(:config) { described_class.new }
 
   describe "#initialize" do
+    before do
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:fetch).with("NJTRANSIT_USERNAME", nil).and_return(nil)
+      allow(ENV).to receive(:fetch).with("NJTRANSIT_PASSWORD", nil).and_return(nil)
+    end
+
     it "sets default base_url" do
       expect(config.base_url).to eq("https://pcsdata.njtransit.com")
     end
