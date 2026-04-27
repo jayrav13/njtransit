@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    njtransit (1.1.0)
+    njtransit (1.1.1)
       faraday (~> 2.0)
       faraday-multipart (~> 1.0)
       faraday-typhoeus (>= 1, < 3)

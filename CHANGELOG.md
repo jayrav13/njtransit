@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-04-26
+
+### Fixed
+
+- `Configuration` initialize specs now stub `NJTRANSIT_USERNAME` / `NJTRANSIT_PASSWORD` so they pass regardless of the host environment
+
 ## [1.1.0] - 2026-03-27
 
 ### Added
