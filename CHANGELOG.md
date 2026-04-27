@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-04-26
+
+### Added
+
+- `CLAUDE.md` "Documentation Sync" section with a table mapping change types to required doc surfaces
+
 ## [1.1.2] - 2026-04-26
 
 ### Changed

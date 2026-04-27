@@ -2,6 +2,28 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Documentation Sync
+
+Any change that affects public behavior, configuration, dependencies, or the release process **must** update every relevant doc surface **in the same PR**. Docs that go stale silently are worse than docs that are missing — readers learn not to trust them.
+
+### Which doc owns which kind of change
+
+| Change | Update |
+|---|---|
+| New or changed public API (method signature, return shape, error class raised) | `README.md` (capability section + relevant examples), `CHANGELOG.md` |
+| New resource class or API host | `CLAUDE.md` Architecture section, `README.md` "Two Clients" table, `CHANGELOG.md` |
+| New environment variable | `README.md` "Environment Variables" table, `CHANGELOG.md` if user-visible |
+| GTFS schema or data-layer changes | `CLAUDE.md` "GTFS Static Layer" section, `README.md` "GTFS Static Data" section if it surfaces in usage |
+| New rake task | `README.md` (where rake tasks are listed), `CHANGELOG.md` |
+| RubyGems metadata change (runtime deps, license, URLs, summary) | `njtransit.gemspec`, `CHANGELOG.md` |
+| New `bin/` script | `README.md` "Development" or "CI & Release" section, `CHANGELOG.md` |
+| CI workflow change | `.github/workflows/ci.yml`, `README.md` "CI & Release" section if it changes the user-facing flow |
+| Release workflow change | `.github/workflows/release.yml`, `README.md` "CI & Release" section if it changes the user-facing flow, `CLAUDE.md` Git Workflow section if the process changes |
+| Git workflow change (issue/branch/commit conventions) | `CLAUDE.md` Git Workflow section |
+| `install-skill` / CLI behavior change | `README.md` "Using with Claude Code" section, `CHANGELOG.md` |
+
+If a change clearly touches multiple categories, all of them apply. If it touches none of them (refactors, internal cleanup with no behavior change), no docs change is required — but call that out in the PR description so it's intentional, not an oversight.
+
 ## Architecture
 
 ### Two Clients
