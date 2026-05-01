@@ -14,7 +14,7 @@ GEM
   remote: https://rubygems.org/
   specs:
     ast (2.4.3)
-    bigdecimal (4.1.0)
+    bigdecimal (4.1.2)
     csv (3.3.5)
     diff-lcs (1.6.2)
     dotenv (3.2.0)
@@ -92,7 +92,7 @@ GEM
       lint_roller (~> 1.1)
       rubocop (~> 1.81)
     ruby-progressbar (1.13.0)
-    sequel (5.103.0)
+    sequel (5.104.0)
       bigdecimal
     sqlite3 (2.9.3)
       mini_portile2 (~> 2.8.0)
