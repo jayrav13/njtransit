@@ -10,7 +10,7 @@ gem "rake", "~> 13.4"
 gem "rspec", "~> 3.0"
 
 gem "rubocop", "~> 1.86"
-gem "rubocop-rspec", "~> 3.0", require: false
+gem "rubocop-rspec", "~> 3.10", require: false
 
 gem "lefthook", "~> 2.1", require: false
 
