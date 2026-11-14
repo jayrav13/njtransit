@@ -15,6 +15,11 @@ module NJTransit
   class Client
     DEFAULT_AUTH_PATH = "/api/BUSDV2/authenticateUser"
 
+    # Each GTFS-RT API issues its own tokens; a bus or rail API token is rejected there.
+    GTFS_AUTH_PATH = "/api/GTFS/authenticateUser"
+    GTFS_G2_AUTH_PATH = "/api/GTFSG2/authenticateUser"
+    RAIL_GTFS_AUTH_PATH = "/api/GTFSRT/getToken"
+
     attr_reader :username, :password, :log_level, :base_url, :timeout, :auth_path, :token_store
 
     def initialize(username:, password:, log_level: "silent", base_url: Configuration::DEFAULT_BASE_URL,
@@ -38,15 +43,15 @@ module NJTransit
     end
 
     def bus_gtfs
-      @bus_gtfs ||= Resources::BusGTFS.new(self)
+      @bus_gtfs ||= Resources::BusGTFS.new(api_client(GTFS_AUTH_PATH))
     end
 
     def bus_gtfs_g2
-      @bus_gtfs_g2 ||= Resources::BusGTFS.new(self, api_prefix: "/api/GTFSG2")
+      @bus_gtfs_g2 ||= Resources::BusGTFS.new(api_client(GTFS_G2_AUTH_PATH), api_prefix: "/api/GTFSG2")
     end
 
     def rail_gtfs
-      @rail_gtfs ||= Resources::RailGTFS.new(self)
+      @rail_gtfs ||= Resources::RailGTFS.new(api_client(RAIL_GTFS_AUTH_PATH))
     end
 
     def get(path, params = {})
@@ -113,9 +118,21 @@ module NJTransit
       store_call(:delete, token_key) if stale.nil? || read_stored_token == stale
     end
 
-    # Store key for this client's token: one per API host and username.
+    # Store key for this client's token: one per host, auth endpoint (i.e. API) and username.
     def token_key
-      "njtransit:token:#{base_url}:#{username}"
+      "njtransit:token:#{base_url}#{auth_path}:#{username}"
+    end
+
+    # A client for another API on this host (its own auth endpoint and token), sharing
+    # this client's credentials, timeout, logging and token store.
+    def api_client(api_auth_path)
+      return self if api_auth_path == auth_path
+
+      @api_clients ||= {}
+      @api_clients[api_auth_path] ||= self.class.new(
+        username: username, password: password, log_level: log_level, base_url: base_url,
+        timeout: timeout, auth_path: api_auth_path, token_store: token_store
+      )
     end
 
     def self.default_token_store
@@ -158,15 +175,14 @@ module NJTransit
         req.body = params
       end
 
-      result = handle_response(response)
-
-      if token_expired?(result) && retry_auth
+      if retry_auth && auth_failure?(response)
         clear_token!
         authenticate!
         params[:token] = @token
         return request_form(method, path, params, retry_auth: false)
       end
 
+      result = handle_response(response)
       check_api_error!(result)
       result
     rescue Faraday::TimeoutError => e
@@ -182,7 +198,7 @@ module NJTransit
         req.body = params
       end
 
-      if retry_auth && raw_auth_failure?(response)
+      if retry_auth && auth_failure?(response)
         clear_token!
         return request_form_raw(method, path, params, retry_auth: false)
       end
@@ -198,15 +214,15 @@ module NJTransit
       raise ConnectionError, e.message
     end
 
-    def token_expired?(result)
-      result.is_a?(Hash) && result["errorMessage"] == "Invalid token."
-    end
-
-    # An expired token on a feed: a JSON "Invalid token." error, or a 401/403.
-    def raw_auth_failure?(response)
+    # A token NJ Transit rejected: a 401/403, or a JSON errorMessage about an invalid token at
+    # any status. Both hosts answer HTTP 500, worded "Invalid token." (rail) or
+    # "Invalid Token. Please authenticate user." (bus).
+    def auth_failure?(response)
       return true if [401, 403].include?(response.status)
+      return false unless json_body?(response.body)
 
-      response.success? && json_body?(response.body) && token_expired?(parse_body(response.body))
+      result = parse_body(response.body)
+      result.is_a?(Hash) && result["errorMessage"].to_s.match?(/invalid token/i)
     end
 
     def json_body?(body)
