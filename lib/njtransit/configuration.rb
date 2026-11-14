@@ -8,7 +8,7 @@ module NJTransit
     DEFAULT_TIMEOUT = 30
 
     attr_accessor :username, :password, :base_url, :timeout, :gtfs_database_path
-    attr_reader :log_level
+    attr_reader :log_level, :token_store
 
     def initialize
       @username = ENV.fetch("NJTRANSIT_USERNAME", nil)
@@ -29,13 +29,19 @@ module NJTransit
       @log_level = level
     end
 
+    # Any object with read, write and delete (e.g. NJTransit::TokenStores::File, Rails.cache); nil for in-memory.
+    def token_store=(store)
+      @token_store = store.nil? ? nil : TokenStores.validate!(store)
+    end
+
     def to_h
       {
         username: username,
         password: password,
         log_level: log_level,
         base_url: base_url,
-        timeout: timeout
+        timeout: timeout,
+        token_store: token_store
       }
     end
 

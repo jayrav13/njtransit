@@ -61,6 +61,24 @@ client.bus.stops_nearby(lat: 40.878, lon: -74.221, radius: 2000, enrich: false)
 client.bus.routes(mode: "HBLR")  # Hudson-Bergen Light Rail
 ```
 
+## Keeping Auth Tokens Across Restarts
+
+NJ Transit caps how many auth tokens you can create per day (as low as 5–10 on some endpoints). By default the gem caches tokens in memory, so every new process authenticates again. A service that restarts often (deploys, crash loops, containers) can hit the cap and be locked out for the rest of the day.
+
+Configure a `token_store` to reuse tokens across restarts:
+
+```ruby
+NJTransit.configure do |config|
+  # A JSON file (created with mode 0600)
+  config.token_store = NJTransit::TokenStores::File.new("tmp/njtransit_tokens.json")
+
+  # ...or, in Rails, any ActiveSupport cache (persists if its backend does)
+  config.token_store = Rails.cache
+end
+```
+
+A token store is any object with `read(key)`, `write(key, token)` and `delete(key)`; anything else raises `ArgumentError` when you assign it. Tokens are keyed by API host and username, so clients and processes sharing a store share one token per account. When the API reports an expired token (a JSON `Invalid token.` error, or a 401/403 on a GTFS-RT feed), the gem deletes it from the store (unless another client already replaced it), authenticates, stores the new one and retries the request once. If the store itself fails, the gem warns on stderr and falls back to authenticating, so a broken cache never breaks requests. `TokenStores::File` locks a `<path>.lock` file around each write, so several processes can share one file.
+
 ## Two Clients, One Gem
 
 NJ Transit splits its API across two hosts. The gem handles this with two clients:
