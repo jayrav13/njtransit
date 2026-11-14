@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-11-14
+
+### Added
+
+- GitHub Pages landing page (`docs/index.md`); https://jayravaliya.com/njtransit/ no longer 404s
+- `CLAUDE.md` Documentation Sync row for the landing page
+
 ## [1.1.4] - 2026-04-26
 
 ### Changed
