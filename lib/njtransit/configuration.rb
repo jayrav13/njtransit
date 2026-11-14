@@ -7,7 +7,8 @@ module NJTransit
     DEFAULT_RAIL_BASE_URL = "https://raildata.njtransit.com"
     DEFAULT_TIMEOUT = 30
 
-    attr_accessor :username, :password, :base_url, :timeout, :gtfs_database_path
+    attr_accessor :username, :password, :base_url, :timeout, :gtfs_database_path,
+                  :token_store
     attr_reader :log_level
 
     def initialize
@@ -35,7 +36,8 @@ module NJTransit
         password: password,
         log_level: log_level,
         base_url: base_url,
-        timeout: timeout
+        timeout: timeout,
+        token_store: token_store
       }
     end
 

@@ -15,11 +15,12 @@ module NJTransit
   class Client
     DEFAULT_AUTH_PATH = "/api/BUSDV2/authenticateUser"
 
-    attr_reader :username, :password, :log_level, :base_url, :timeout, :auth_path
+    attr_reader :username, :password, :log_level, :base_url, :timeout, :auth_path, :token_store
 
     def initialize(username:, password:, log_level: "silent", base_url: Configuration::DEFAULT_BASE_URL,
-                   timeout: Configuration::DEFAULT_TIMEOUT, auth_path: DEFAULT_AUTH_PATH)
+                   timeout: Configuration::DEFAULT_TIMEOUT, auth_path: DEFAULT_AUTH_PATH, token_store: nil)
       @username = username
+      @token_store = token_store || self.class.default_token_store
       @password = password
       @log_level = log_level
       @base_url = base_url
@@ -77,7 +78,7 @@ module NJTransit
     end
 
     def authenticate!
-      cached = self.class.token_cache[base_url]
+      cached = read_stored_token
       if cached
         @token = cached
         return @token
@@ -95,7 +96,7 @@ module NJTransit
       end
 
       @token = result["UserToken"]
-      self.class.token_cache[base_url] = @token
+      write_stored_token(@token)
       @token
     end
 
@@ -106,15 +107,27 @@ module NJTransit
 
     def clear_token!
       @token = nil
-      self.class.token_cache.delete(base_url)
+      store_call(:delete, token_key)
     end
 
+    # Store key for this client's token: one per API host and username.
+    def token_key
+      "njtransit:token:#{base_url}:#{username}"
+    end
+
+    def self.default_token_store
+      @default_token_store ||= TokenStores::Memory.new
+    end
+
+    # Deprecated: use default_token_store, or configure a token_store.
     def self.token_cache
-      @token_cache ||= {}
+      warn "[njtransit] Client.token_cache is deprecated; use Client.default_token_store " \
+           "or configure token_store. Keys are now \"njtransit:token:<base_url>:<username>\"."
+      default_token_store.to_h
     end
 
     def self.clear_token_cache!
-      @token_cache = {}
+      default_token_store.clear
     end
 
     private
@@ -159,7 +172,7 @@ module NJTransit
       raise ConnectionError, e.message
     end
 
-    def request_form_raw(method, path, params = {})
+    def request_form_raw(method, path, params = {}, retry_auth: true)
       params[:token] = token
       response = raw_connection.public_send(method) do |req|
         req.url(path)
@@ -167,6 +180,11 @@ module NJTransit
       end
 
       raise error_for_status(response.status).new(error_message(response), response: response) unless response.success?
+
+      if retry_auth && raw_token_expired?(response.body)
+        clear_token!
+        return request_form_raw(method, path, params, retry_auth: false)
+      end
 
       response.body
     rescue Faraday::TimeoutError => e
@@ -177,6 +195,27 @@ module NJTransit
 
     def token_expired?(result)
       result.is_a?(Hash) && result["errorMessage"] == "Invalid token."
+    end
+
+    # Feeds are protobuf; an expired token comes back as a JSON error instead.
+    def raw_token_expired?(body)
+      body.is_a?(String) && body.start_with?("{") && token_expired?(parse_body(body))
+    end
+
+    def read_stored_token
+      store_call(:read, token_key)
+    end
+
+    def write_stored_token(token)
+      store_call(:write, token_key, token)
+    end
+
+    # A broken store must not break requests: fall back to authenticating.
+    def store_call(method, *)
+      token_store.public_send(method, *)
+    rescue StandardError => e
+      logger.warn("token store #{method} failed: #{e.class}: #{e.message}") if logging_enabled?
+      nil
     end
 
     def check_api_error!(result)

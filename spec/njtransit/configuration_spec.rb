@@ -26,6 +26,10 @@ RSpec.describe NJTransit::Configuration do
       expect(config.username).to be_nil
     end
 
+    it "defaults token_store to nil (the shared in-memory store)" do
+      expect(config.token_store).to be_nil
+    end
+
     it "defaults password to nil" do
       expect(config.password).to be_nil
     end
@@ -96,7 +100,8 @@ RSpec.describe NJTransit::Configuration do
         password: "test_pass",
         log_level: "debug",
         base_url: "https://pcsdata.njtransit.com",
-        timeout: 30
+        timeout: 30,
+        token_store: nil
       )
     end
   end

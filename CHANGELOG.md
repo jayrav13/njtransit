@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-14
+
+### Added
+
+- Pluggable auth token store (`config.token_store` / `Client.new(token_store:)`): any object with `read`, `write` and `delete`, including `Rails.cache`. Lets long-running processes reuse a token across restarts instead of hitting NJ Transit's daily token cap
+- `NJTransit::TokenStores::Memory` (the default, shared per process) and `NJTransit::TokenStores::File` (JSON file, mode 0600, atomic writes)
+- `Client#token_key` and `Client.default_token_store`
+
+### Changed
+
+- Tokens are keyed by API host and username (`njtransit:token:<base_url>:<username>`), not host alone
+- Raw GTFS-RT requests now detect an expired token, re-authenticate and retry once, as JSON requests already did
+- A failing token store is logged and bypassed instead of raising
+
+### Deprecated
+
+- `Client.token_cache`: use `Client.default_token_store` or configure `token_store`
+
 ## [1.1.5] - 2026-11-14
 
 ### Added

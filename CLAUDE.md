@@ -56,6 +56,7 @@ SQLite-backed offline schedule data. Import from GTFS zip, then query via `NJTra
 - **`enrich` flag**: Bus API methods default to `enrich: true`, which joins GTFS static data (lat/lon, route names). Use `enrich: false` if GTFS isn't imported or you don't need it.
 - **`mode` parameter**: Bus methods default to `mode: "BUS"`. Pass `"HBLR"`, `"NLR"`, `"RL"`, or `"ALL"` for light rail.
 - **`stops_nearby` radius**: The radius parameter is in **feet**, not miles.
+- **Token store**: Auth tokens go through a pluggable `token_store` (`lib/njtransit/token_stores.rb`): any object with `read`/`write`/`delete`, such as `TokenStores::File` or `Rails.cache`. The default is one shared `TokenStores::Memory` per process. Expired tokens are deleted from the store and the request is retried once, on both the JSON and raw (GTFS-RT) paths.
 - **Raw responses**: GTFS-RT methods (`bus_gtfs`, `rail_gtfs`) return binary protobuf data via `post_form_raw`.
 
 ## Testing
