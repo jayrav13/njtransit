@@ -7,9 +7,8 @@ module NJTransit
     DEFAULT_RAIL_BASE_URL = "https://raildata.njtransit.com"
     DEFAULT_TIMEOUT = 30
 
-    attr_accessor :username, :password, :base_url, :timeout, :gtfs_database_path,
-                  :token_store
-    attr_reader :log_level
+    attr_accessor :username, :password, :base_url, :timeout, :gtfs_database_path
+    attr_reader :log_level, :token_store
 
     def initialize
       @username = ENV.fetch("NJTRANSIT_USERNAME", nil)
@@ -28,6 +27,11 @@ module NJTransit
       end
 
       @log_level = level
+    end
+
+    # Any object with read, write and delete (e.g. NJTransit::TokenStores::File, Rails.cache); nil for in-memory.
+    def token_store=(store)
+      @token_store = store.nil? ? nil : TokenStores.validate!(store)
     end
 
     def to_h

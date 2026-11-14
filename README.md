@@ -77,7 +77,7 @@ NJTransit.configure do |config|
 end
 ```
 
-A token store is any object with `read(key)`, `write(key, token)` and `delete(key)`. Tokens are keyed by API host and username. When the API reports an expired token, the gem deletes it from the store, authenticates, stores the new one and retries the request once (for JSON and raw GTFS-RT calls alike). If the store itself fails, the gem logs it and falls back to authenticating, so a broken cache never breaks requests.
+A token store is any object with `read(key)`, `write(key, token)` and `delete(key)`; anything else raises `ArgumentError` when you assign it. Tokens are keyed by API host and username, so clients and processes sharing a store share one token per account. When the API reports an expired token (a JSON `Invalid token.` error, or a 401/403 on a GTFS-RT feed), the gem deletes it from the store (unless another client already replaced it), authenticates, stores the new one and retries the request once. If the store itself fails, the gem warns on stderr and falls back to authenticating, so a broken cache never breaks requests. `TokenStores::File` locks a `<path>.lock` file around each write, so several processes can share one file.
 
 ## Two Clients, One Gem
 

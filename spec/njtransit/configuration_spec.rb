@@ -30,6 +30,10 @@ RSpec.describe NJTransit::Configuration do
       expect(config.token_store).to be_nil
     end
 
+    it "rejects a token_store without read, write and delete" do
+      expect { config.token_store = "tokens.json" }.to raise_error(ArgumentError, /token_store/)
+    end
+
     it "defaults password to nil" do
       expect(config.password).to be_nil
     end

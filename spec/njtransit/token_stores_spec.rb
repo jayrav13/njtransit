@@ -61,6 +61,30 @@ RSpec.describe NJTransit::TokenStores::File do
     expect(File.stat(path).mode & 0o777).to eq(0o600)
   end
 
+  it "keeps every key when several processes write at once" do
+    file = path # resolve the lazy tmpdir before forking
+    pids = Array.new(8) do |i|
+      fork do
+        writer = described_class.new(file)
+        20.times { |j| writer.write("p#{i}-#{j}", "t") }
+        exit!(0)
+      end
+    end
+    pids.each { |pid| Process.wait(pid) }
+
+    expect(JSON.parse(File.read(file)).size).to eq(160)
+  end
+
+  it "survives two instances on the same path writing from many threads" do
+    stores = [described_class.new(path), described_class.new(path)]
+    threads = Array.new(10) do |i|
+      Thread.new { 20.times { |j| stores[i % 2].write("t#{i}-#{j}", "x") } }
+    end
+    threads.each(&:join)
+
+    expect(JSON.parse(File.read(path)).size).to eq(200)
+  end
+
   it "treats a corrupt file as empty" do
     FileUtils.mkdir_p(File.dirname(path))
     File.write(path, "not json")

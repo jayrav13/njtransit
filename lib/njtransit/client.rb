@@ -20,7 +20,7 @@ module NJTransit
     def initialize(username:, password:, log_level: "silent", base_url: Configuration::DEFAULT_BASE_URL,
                    timeout: Configuration::DEFAULT_TIMEOUT, auth_path: DEFAULT_AUTH_PATH, token_store: nil)
       @username = username
-      @token_store = token_store || self.class.default_token_store
+      @token_store = token_store ? TokenStores.validate!(token_store) : self.class.default_token_store
       @password = password
       @log_level = log_level
       @base_url = base_url
@@ -105,9 +105,12 @@ module NJTransit
       @token
     end
 
+    # Forget this client's token. The stored copy is deleted only if it is still the
+    # token this client held, so a fresh token another client just stored survives.
     def clear_token!
+      stale = @token
       @token = nil
-      store_call(:delete, token_key)
+      store_call(:delete, token_key) if stale.nil? || read_stored_token == stale
     end
 
     # Store key for this client's token: one per API host and username.
@@ -179,13 +182,15 @@ module NJTransit
         req.body = params
       end
 
-      raise error_for_status(response.status).new(error_message(response), response: response) unless response.success?
-
-      if retry_auth && raw_token_expired?(response.body)
+      if retry_auth && raw_auth_failure?(response)
         clear_token!
         return request_form_raw(method, path, params, retry_auth: false)
       end
 
+      raise error_for_status(response.status).new(error_message(response), response: response) unless response.success?
+
+      # Feeds are protobuf, which never starts with "{": a JSON body is an API error.
+      check_api_error!(parse_body(response.body)) if json_body?(response.body)
       response.body
     rescue Faraday::TimeoutError => e
       raise TimeoutError, e.message
@@ -197,9 +202,15 @@ module NJTransit
       result.is_a?(Hash) && result["errorMessage"] == "Invalid token."
     end
 
-    # Feeds are protobuf; an expired token comes back as a JSON error instead.
-    def raw_token_expired?(body)
-      body.is_a?(String) && body.start_with?("{") && token_expired?(parse_body(body))
+    # An expired token on a feed: a JSON "Invalid token." error, or a 401/403.
+    def raw_auth_failure?(response)
+      return true if [401, 403].include?(response.status)
+
+      response.success? && json_body?(response.body) && token_expired?(parse_body(response.body))
+    end
+
+    def json_body?(body)
+      body.is_a?(String) && body.start_with?("{")
     end
 
     def read_stored_token
@@ -210,11 +221,12 @@ module NJTransit
       store_call(:write, token_key, token)
     end
 
-    # A broken store must not break requests: fall back to authenticating.
+    # A broken store must not break requests: fall back to authenticating, but always
+    # warn (whatever log_level is), since each fallback spends a capped token.
     def store_call(method, *)
       token_store.public_send(method, *)
     rescue StandardError => e
-      logger.warn("token store #{method} failed: #{e.class}: #{e.message}") if logging_enabled?
+      warn "[njtransit] token store #{method} failed: #{e.class}: #{e.message}"
       nil
     end
 

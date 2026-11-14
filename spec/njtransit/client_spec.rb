@@ -231,13 +231,59 @@ RSpec.describe NJTransit::Client do
     end
   end
 
+  describe "shared store, concurrent expiry" do
+    let(:store) { NJTransit::TokenStores::Memory.new }
+    let(:connection) { instance_double(Faraday::Connection) }
+    let(:clients) do
+      Array.new(2) do
+        described_class.new(username: "u", password: "p", token_store: store).tap do |c|
+          allow(c).to receive(:form_connection).and_return(connection)
+        end
+      end
+    end
+
+    before do
+      auth = instance_double(Faraday::Response, success?: true, body: '{"Authenticated": "True", "UserToken": "fresh"}')
+      allow(connection).to receive(:post).and_yield(double(body: nil).as_null_object).and_return(auth)
+      store.write(clients.first.token_key, "stale")
+      clients.each(&:token) # both now hold "stale"
+    end
+
+    it "does not delete a fresh token another client stored, so one expiry costs one auth call" do
+      a, b = clients
+      a.clear_token!
+      a.token
+      b.clear_token!
+
+      expect(b.token).to eq("fresh")
+      expect(connection).to have_received(:post).once
+    end
+  end
+
+  describe "token store validation and failures" do
+    it "rejects a store without read, write and delete" do
+      expect { described_class.new(username: "u", password: "p", token_store: "tokens.json") }
+        .to raise_error(ArgumentError, /token_store/)
+    end
+
+    it "warns on stderr when the store fails, even with logging silent" do
+      store = NJTransit::TokenStores::Memory.new
+      allow(store).to receive(:read).and_raise(IOError, "disk gone")
+      client = described_class.new(username: "u", password: "p", token_store: store)
+      allow(client).to receive(:authenticate!) { client.send(:read_stored_token) }
+
+      expect { client.token }.to output(/token store read failed: IOError: disk gone/).to_stderr
+    end
+  end
+
   describe "#post_form_raw with an expired stored token" do
     let(:store) { NJTransit::TokenStores::Memory.new }
     let(:client) { described_class.new(username: "test_user", password: "test_pass", token_store: store) }
     let(:sent_tokens) { [] }
+    let(:raw_responses) { [response('{"errorMessage":"Invalid token."}'), response("\x0A\x0Dprotobuf")] }
 
-    def response(body)
-      instance_double(Faraday::Response, success?: true, status: 200, body: body)
+    def response(body, status: 200)
+      instance_double(Faraday::Response, success?: status == 200, status: status, body: body)
     end
 
     before do
@@ -247,12 +293,11 @@ RSpec.describe NJTransit::Client do
       allow(client).to receive_messages(raw_connection: raw_connection, form_connection: form_connection)
       allow(form_connection).to receive(:post).and_yield(double(body: nil).as_null_object)
                                               .and_return(response('{"Authenticated": "True", "UserToken": "fresh"}'))
-      responses = [response('{"errorMessage":"Invalid token."}'), response("\x0A\x0Dprotobuf")]
       allow(raw_connection).to receive(:post) do |&block|
         req = double(url: nil)
         allow(req).to receive(:body=) { |params| sent_tokens << params[:token] }
         block.call(req)
-        responses.shift
+        raw_responses.shift
       end
     end
 
@@ -260,6 +305,34 @@ RSpec.describe NJTransit::Client do
       expect(client.post_form_raw("/api/GTFSRT/getTripUpdates")).to eq("\x0A\x0Dprotobuf")
       expect(sent_tokens).to eq(%w[stale fresh])
       expect(store.read(client.token_key)).to eq("fresh")
+    end
+
+    context "when the expired token comes back as a 401" do
+      let(:raw_responses) { [response("Unauthorized", status: 401), response("\x0A\x0Dprotobuf")] }
+
+      it "replaces the stale token and retries once" do
+        expect(client.post_form_raw("/api/GTFSRT/getTripUpdates")).to eq("\x0A\x0Dprotobuf")
+        expect(store.read(client.token_key)).to eq("fresh")
+      end
+    end
+
+    context "when the retry still gets a JSON error" do
+      let(:raw_responses) { Array.new(2) { response('{"errorMessage":"Invalid token."}') } }
+
+      it "raises instead of returning the JSON as feed bytes" do
+        expect { client.post_form_raw("/api/GTFSRT/getTripUpdates") }
+          .to raise_error(NJTransit::APIError, "Invalid token.")
+      end
+    end
+
+    context "when the API returns a non-token JSON error" do
+      let(:raw_responses) { [response('{"errorMessage":"Daily usage limit:10"}')] }
+
+      it "raises without re-authenticating" do
+        expect { client.post_form_raw("/api/GTFSRT/getTripUpdates") }
+          .to raise_error(NJTransit::APIError, "Daily usage limit:10")
+        expect(sent_tokens).to eq(%w[stale])
+      end
     end
   end
 end
