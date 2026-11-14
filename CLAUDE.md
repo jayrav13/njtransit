@@ -12,6 +12,7 @@ Any change that affects public behavior, configuration, dependencies, or the rel
 |---|---|
 | New or changed public API (method signature, return shape, error class raised) | `README.md` (capability section + relevant examples), `CHANGELOG.md` |
 | New resource class or API host | `CLAUDE.md` Architecture section, `README.md` "Two Clients" table, `CHANGELOG.md` |
+| Quick Start, install or headline capabilities | `README.md`, `docs/index.md` (the GitHub Pages landing page at jayravaliya.com/njtransit) |
 | New environment variable | `README.md` "Environment Variables" table, `CHANGELOG.md` if user-visible |
 | GTFS schema or data-layer changes | `CLAUDE.md` "GTFS Static Layer" section, `README.md` "GTFS Static Data" section if it surfaces in usage |
 | New rake task | `README.md` (where rake tasks are listed), `CHANGELOG.md` |
