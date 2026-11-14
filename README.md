@@ -130,6 +130,13 @@ A newer G2 version of the bus feeds is also available via `client.bus_gtfs_g2`.
 
 Each GTFS-RT API issues its own auth tokens (a bus or rail API token is rejected there), so `bus_gtfs`, `bus_gtfs_g2` and `rail_gtfs` each log in at their own endpoint (`/api/GTFS/authenticateUser`, `/api/GTFSG2/authenticateUser`, `/api/GTFSRT/getToken`). They share the parent client's credentials and token store.
 
+`Client#api_client(auth_path)` gives you the same kind of client for any other API on a host: it returns a client that logs in at `auth_path` and shares the parent's credentials, timeout, logging and token store (or the parent itself, if `auth_path` is its own endpoint):
+
+```ruby
+feeds = NJTransit.client.api_client("/api/GTFS/authenticateUser")
+feeds.token_key # => "njtransit:token:https://pcsdata.njtransit.com/api/GTFS/authenticateUser:<username>"
+```
+
 ## Using with Claude Code
 
 Install the gem, then run the skill installer:

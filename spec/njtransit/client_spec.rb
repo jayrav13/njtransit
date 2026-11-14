@@ -406,6 +406,7 @@ RSpec.describe NJTransit::Client do
   describe "#post_form with a token rejected as HTTP 500" do
     let(:client) { described_class.new(username: "u", password: "p", token_store: NJTransit::TokenStores::Memory.new) }
     let(:auth_calls) { [] }
+    let(:sent_tokens) { [] }
 
     def response(body, status: 200)
       instance_double(Faraday::Response, success?: status == 200, status: status, body: body)
@@ -418,15 +419,18 @@ RSpec.describe NJTransit::Client do
                response('{"Authenticated": "True", "UserToken": "fresh"}'),
                response('[{"ok": true}]')]
       allow(connection).to receive(:post) do |path = nil, &block|
+        req = double(url: nil)
+        allow(req).to receive(:body=) { |params| sent_tokens << params[:token] unless path }
         auth_calls << path if path
-        block&.call(double.as_null_object)
+        block&.call(req)
         queue.shift
       end
     end
 
-    it "re-authenticates and retries once" do
+    it "re-authenticates and retries once with the fresh token" do
       expect(client.post_form("/api/BUSDV2/getRoutes", token: "stale")).to eq([{ "ok" => true }])
       expect(auth_calls).to eq(["/api/BUSDV2/authenticateUser"])
+      expect(sent_tokens).to eq(%w[stale fresh])
     end
   end
 end

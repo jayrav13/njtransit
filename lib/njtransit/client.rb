@@ -142,7 +142,7 @@ module NJTransit
     # Deprecated: use default_token_store, or configure a token_store.
     def self.token_cache
       warn "[njtransit] Client.token_cache is deprecated; use Client.default_token_store " \
-           "or configure token_store. Keys are now \"njtransit:token:<base_url>:<username>\"."
+           "or configure token_store. Keys are now \"njtransit:token:<base_url><auth_path>:<username>\"."
       default_token_store.to_h
     end
 
