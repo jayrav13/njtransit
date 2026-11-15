@@ -77,7 +77,7 @@ NJTransit.configure do |config|
 end
 ```
 
-A token store is any object with `read(key)`, `write(key, token)` and `delete(key)`; anything else raises `ArgumentError` when you assign it. Tokens are keyed by API host and username, so clients and processes sharing a store share one token per account. When the API reports an expired token (a JSON `Invalid token.` error, or a 401/403 on a GTFS-RT feed), the gem deletes it from the store (unless another client already replaced it), authenticates, stores the new one and retries the request once. If the store itself fails, the gem warns on stderr and falls back to authenticating, so a broken cache never breaks requests. `TokenStores::File` locks a `<path>.lock` file around each write, so several processes can share one file.
+A token store is any object with `read(key)`, `write(key, token)` and `delete(key)`; anything else raises `ArgumentError` when you assign it. Tokens are keyed by API host, auth endpoint and username (`njtransit:token:<base_url><auth_path>:<username>`), so clients and processes sharing a store share one token per API per account. When the API rejects a token (a 401/403, or a JSON error mentioning an invalid token at any status; NJ Transit answers HTTP 500), the gem deletes it from the store (unless another client already replaced it), authenticates, stores the new one and retries the request once. If the store itself fails, the gem warns on stderr and falls back to authenticating, so a broken cache never breaks requests. `TokenStores::File` locks a `<path>.lock` file around each write, so several processes can share one file.
 
 ## Two Clients, One Gem
 
@@ -127,6 +127,15 @@ rail_client.rail_gtfs.trip_updates # Rail trip updates
 ```
 
 A newer G2 version of the bus feeds is also available via `client.bus_gtfs_g2`.
+
+Each GTFS-RT API issues its own auth tokens (a bus or rail API token is rejected there), so `bus_gtfs`, `bus_gtfs_g2` and `rail_gtfs` each log in at their own endpoint (`/api/GTFS/authenticateUser`, `/api/GTFSG2/authenticateUser`, `/api/GTFSRT/getToken`). They share the parent client's credentials and token store.
+
+`Client#api_client(auth_path)` gives you the same kind of client for any other API on a host: it returns a client that logs in at `auth_path` and shares the parent's credentials, timeout, logging and token store (or the parent itself, if `auth_path` is its own endpoint):
+
+```ruby
+feeds = NJTransit.client.api_client("/api/GTFS/authenticateUser")
+feeds.token_key # => "njtransit:token:https://pcsdata.njtransit.com/api/GTFS/authenticateUser:<username>"
+```
 
 ## Using with Claude Code
 

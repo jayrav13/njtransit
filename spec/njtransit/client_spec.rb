@@ -307,6 +307,38 @@ RSpec.describe NJTransit::Client do
       expect(store.read(client.token_key)).to eq("fresh")
     end
 
+    context "when the bus feed rejects the token with an HTTP 500" do
+      let(:raw_responses) do
+        [response('{"errorMessage":"Invalid Token. Please authenticate user."}', status: 500),
+         response("\x0A\x0Dprotobuf")]
+      end
+
+      it "replaces the stale token and retries once" do
+        expect(client.post_form_raw("/api/GTFS/getTripUpdates")).to eq("\x0A\x0Dprotobuf")
+        expect(sent_tokens).to eq(%w[stale fresh])
+      end
+    end
+
+    context "when the rail feed rejects the token with an HTTP 500 twice" do
+      let(:raw_responses) { Array.new(2) { response('{"errorMessage":"Invalid token."}', status: 500) } }
+
+      it "raises after one retry" do
+        expect { client.post_form_raw("/api/GTFSRT/getTripUpdates") }
+          .to raise_error(NJTransit::InternalServerError, "Invalid token.")
+        expect(sent_tokens).to eq(%w[stale fresh])
+      end
+    end
+
+    context "when a 500 is not about the token" do
+      let(:raw_responses) { [response('{"errorMessage":"Something broke"}', status: 500)] }
+
+      it "raises without re-authenticating" do
+        expect { client.post_form_raw("/api/GTFS/getTripUpdates") }
+          .to raise_error(NJTransit::InternalServerError, "Something broke")
+        expect(sent_tokens).to eq(%w[stale])
+      end
+    end
+
     context "when the expired token comes back as a 401" do
       let(:raw_responses) { [response("Unauthorized", status: 401), response("\x0A\x0Dprotobuf")] }
 
@@ -333,6 +365,72 @@ RSpec.describe NJTransit::Client do
           .to raise_error(NJTransit::APIError, "Daily usage limit:10")
         expect(sent_tokens).to eq(%w[stale])
       end
+    end
+  end
+
+  describe "GTFS-RT auth endpoints" do
+    let(:store) { NJTransit::TokenStores::Memory.new }
+    let(:bus) { described_class.new(username: "u", password: "p", token_store: store, timeout: 7, log_level: "info") }
+    let(:rail) do
+      described_class.new(username: "u", password: "p", token_store: store,
+                          base_url: "https://raildata.njtransit.com", auth_path: "/api/TrainData/getToken")
+    end
+
+    it "authenticates each feed API at its own endpoint" do
+      expect([bus.bus_gtfs.client.auth_path, bus.bus_gtfs_g2.client.auth_path, rail.rail_gtfs.client.auth_path])
+        .to eq(%w[/api/GTFS/authenticateUser /api/GTFSG2/authenticateUser /api/GTFSRT/getToken])
+    end
+
+    it "keeps the JSON APIs on their own endpoints" do
+      expect([bus.bus.client.auth_path, rail.rail.client.auth_path])
+        .to eq(%w[/api/BUSDV2/authenticateUser /api/TrainData/getToken])
+    end
+
+    it "gives every API its own token key" do
+      keys = [bus.token_key, bus.bus_gtfs.client.token_key, bus.bus_gtfs_g2.client.token_key,
+              rail.token_key, rail.rail_gtfs.client.token_key]
+      expect(keys.uniq.size).to eq(5)
+    end
+
+    it "shares the parent's credentials, host, timeout, logging and token store" do
+      feed = bus.bus_gtfs.client
+      expect([feed.username, feed.password, feed.base_url, feed.timeout, feed.log_level, feed.token_store])
+        .to eq(["u", "p", bus.base_url, 7, "info", store])
+    end
+
+    it "keys tokens by host, auth endpoint and username" do
+      expect(bus.token_key).to eq("njtransit:token:https://pcsdata.njtransit.com/api/BUSDV2/authenticateUser:u")
+    end
+  end
+
+  describe "#post_form with a token rejected as HTTP 500" do
+    let(:client) { described_class.new(username: "u", password: "p", token_store: NJTransit::TokenStores::Memory.new) }
+    let(:auth_calls) { [] }
+    let(:sent_tokens) { [] }
+
+    def response(body, status: 200)
+      instance_double(Faraday::Response, success?: status == 200, status: status, body: body)
+    end
+
+    before do
+      connection = instance_double(Faraday::Connection)
+      allow(client).to receive(:form_connection).and_return(connection)
+      queue = [response('{"errorMessage":"Invalid Token. Please authenticate user."}', status: 500),
+               response('{"Authenticated": "True", "UserToken": "fresh"}'),
+               response('[{"ok": true}]')]
+      allow(connection).to receive(:post) do |path = nil, &block|
+        req = double(url: nil)
+        allow(req).to receive(:body=) { |params| sent_tokens << params[:token] unless path }
+        auth_calls << path if path
+        block&.call(req)
+        queue.shift
+      end
+    end
+
+    it "re-authenticates and retries once with the fresh token" do
+      expect(client.post_form("/api/BUSDV2/getRoutes", token: "stale")).to eq([{ "ok" => true }])
+      expect(auth_calls).to eq(["/api/BUSDV2/authenticateUser"])
+      expect(sent_tokens).to eq(%w[stale fresh])
     end
   end
 end

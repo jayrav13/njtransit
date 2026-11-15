@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-14
+
+### Fixed
+
+- GTFS-RT feeds (`bus_gtfs`, `bus_gtfs_g2`, `rail_gtfs`) now authenticate at their own APIs (`/api/GTFS/authenticateUser`, `/api/GTFSG2/authenticateUser`, `/api/GTFSRT/getToken`). They used to reuse the bus or rail API token, which NJ Transit rejects, so every feed call failed
+- A token rejected with HTTP 500 and a JSON "invalid token" error (NJ Transit's actual response, worded "Invalid token." or "Invalid Token. Please authenticate user.") now triggers one re-authentication and retry on both the JSON and raw paths, instead of raising `InternalServerError`
+
+### Added
+
+- `Client#api_client(auth_path)`: a client for another API on the same host, sharing credentials, timeout, logging and token store
+
+### Changed
+
+- Token store keys include the auth endpoint: `njtransit:token:<base_url><auth_path>:<username>`. Tokens stored by 1.2.0 aren't found under the new keys, so each API mints one fresh token after upgrading
+
 ## [1.2.0] - 2026-11-14
 
 ### Added
