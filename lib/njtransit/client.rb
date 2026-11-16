@@ -4,6 +4,7 @@ require "faraday"
 require "faraday/typhoeus"
 require "faraday/multipart"
 require "json"
+require "monitor"
 
 require_relative "resources/base"
 require_relative "resources/bus"
@@ -20,6 +21,10 @@ module NJTransit
     GTFS_G2_AUTH_PATH = "/api/GTFSG2/authenticateUser"
     RAIL_GTFS_AUTH_PATH = "/api/GTFSRT/getToken"
 
+    TOKEN_LOCKS = {} # rubocop:disable Style/MutableConstant -- guarded by TOKEN_LOCKS_MUTEX
+    TOKEN_LOCKS_MUTEX = Mutex.new
+    private_constant :TOKEN_LOCKS, :TOKEN_LOCKS_MUTEX
+
     attr_reader :username, :password, :log_level, :base_url, :timeout, :auth_path, :token_store
 
     def initialize(username:, password:, log_level: "silent", base_url: Configuration::DEFAULT_BASE_URL,
@@ -32,6 +37,9 @@ module NJTransit
       @timeout = timeout
       @auth_path = auth_path
       @token = nil
+      @api_clients = {}
+      @api_clients_lock = Mutex.new
+      @token_lock = self.class.token_lock(token_key)
     end
 
     def bus
@@ -83,6 +91,69 @@ module NJTransit
     end
 
     def authenticate!
+      token_lock.synchronize { authenticate_unlocked! }
+    end
+
+    def token
+      @token || token_lock.synchronize { @token || authenticate! }
+    end
+
+    # Forget this client's token. The stored copy is deleted only if it is still the
+    # token this client held, so a fresh token another client just stored survives.
+    def clear_token!
+      token_lock.synchronize do
+        stale = @token
+        @token = nil
+        store_call(:delete, token_key) if stale.nil? || read_stored_token == stale
+      end
+    end
+
+    # Store key for this client's token: one per host, auth endpoint (i.e. API) and username.
+    def token_key
+      "njtransit:token:#{base_url}#{auth_path}:#{username}"
+    end
+
+    # A client for another API on this host (its own auth endpoint and token), sharing
+    # this client's credentials, timeout, logging and token store. Memoized: every
+    # caller (and thread) gets the same instance per auth path.
+    def api_client(api_auth_path)
+      return self if api_auth_path == auth_path
+
+      @api_clients_lock.synchronize do
+        @api_clients[api_auth_path] ||= self.class.new(
+          username: username, password: password, log_level: log_level, base_url: base_url,
+          timeout: timeout, auth_path: api_auth_path, token_store: token_store
+        )
+      end
+    end
+
+    def self.default_token_store
+      @default_token_store ||= TokenStores::Memory.new
+    end
+
+    # One reentrant lock per token key, shared by every client in this process, so reading,
+    # minting and replacing a token for one API is single-flight across threads.
+    def self.token_lock(key)
+      TOKEN_LOCKS_MUTEX.synchronize { TOKEN_LOCKS[key] ||= Monitor.new }
+    end
+
+    # Deprecated: use default_token_store, or configure a token_store.
+    def self.token_cache
+      warn "[njtransit] Client.token_cache is deprecated; use Client.default_token_store " \
+           "or configure token_store. Keys are now \"njtransit:token:<base_url><auth_path>:<username>\"."
+      default_token_store.to_h
+    end
+
+    def self.clear_token_cache!
+      default_token_store.clear
+    end
+
+    private
+
+    attr_reader :token_lock
+
+    # Callers hold token_lock.
+    def authenticate_unlocked!
       cached = read_stored_token
       if cached
         @token = cached
@@ -105,52 +176,24 @@ module NJTransit
       @token
     end
 
-    def token
-      authenticate! if @token.nil?
-      @token
+    # The token `rejected` was refused: return the token to retry with. Under the token
+    # lock, so concurrent rejections mint once. If this client or the store already holds
+    # a different token (another thread or client replaced it), use that without minting;
+    # otherwise delete the stored copy only if it is still the rejected one, and mint.
+    def renew_token!(rejected)
+      token_lock.synchronize do
+        return @token if @token && @token != rejected
+
+        @token = nil
+        stored = read_stored_token
+        if stored && stored != rejected
+          @token = stored
+        else
+          store_call(:delete, token_key) if stored
+          authenticate_unlocked!
+        end
+      end
     end
-
-    # Forget this client's token. The stored copy is deleted only if it is still the
-    # token this client held, so a fresh token another client just stored survives.
-    def clear_token!
-      stale = @token
-      @token = nil
-      store_call(:delete, token_key) if stale.nil? || read_stored_token == stale
-    end
-
-    # Store key for this client's token: one per host, auth endpoint (i.e. API) and username.
-    def token_key
-      "njtransit:token:#{base_url}#{auth_path}:#{username}"
-    end
-
-    # A client for another API on this host (its own auth endpoint and token), sharing
-    # this client's credentials, timeout, logging and token store.
-    def api_client(api_auth_path)
-      return self if api_auth_path == auth_path
-
-      @api_clients ||= {}
-      @api_clients[api_auth_path] ||= self.class.new(
-        username: username, password: password, log_level: log_level, base_url: base_url,
-        timeout: timeout, auth_path: api_auth_path, token_store: token_store
-      )
-    end
-
-    def self.default_token_store
-      @default_token_store ||= TokenStores::Memory.new
-    end
-
-    # Deprecated: use default_token_store, or configure a token_store.
-    def self.token_cache
-      warn "[njtransit] Client.token_cache is deprecated; use Client.default_token_store " \
-           "or configure token_store. Keys are now \"njtransit:token:<base_url><auth_path>:<username>\"."
-      default_token_store.to_h
-    end
-
-    def self.clear_token_cache!
-      default_token_store.clear
-    end
-
-    private
 
     def request(method, path, params_or_body = {})
       response = json_connection.public_send(method) do |req|
@@ -176,9 +219,7 @@ module NJTransit
       end
 
       if retry_auth && auth_failure?(response)
-        clear_token!
-        authenticate!
-        params[:token] = @token
+        params[:token] = renew_token!(params[:token])
         return request_form(method, path, params, retry_auth: false)
       end
 
@@ -192,14 +233,14 @@ module NJTransit
     end
 
     def request_form_raw(method, path, params = {}, retry_auth: true)
-      params[:token] = token
+      params[:token] = token if retry_auth
       response = raw_connection.public_send(method) do |req|
         req.url(path)
         req.body = params
       end
 
       if retry_auth && auth_failure?(response)
-        clear_token!
+        params[:token] = renew_token!(params[:token])
         return request_form_raw(method, path, params, retry_auth: false)
       end
 

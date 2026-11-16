@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Threads sharing one client no longer mint a token each when NJ Transit rejects the token they all sent. Renewal is single-flight per API (one lock per token key, shared by every client in the process): the first thread mints, the others retry with its token. A rejection deletes the stored token only if it is still the one that was sent, and a token another thread or client already stored is reused without minting. Applies on both the JSON form and raw (GTFS-RT) paths
+- `Client#api_client`, `NJTransit.client` and `NJTransit.rail_client` are memoized under a lock, so threads racing on first use share one instance
+
+The token store contract (`read`/`write`/`delete`) is unchanged. Races between separate processes sharing a store are not covered: each process can still mint once per rejection
+
 ## [1.3.0] - 2026-11-14
 
 ### Fixed

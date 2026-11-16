@@ -56,13 +56,13 @@ SQLite-backed offline schedule data. Import from GTFS zip, then query via `NJTra
 - **`enrich` flag**: Bus API methods default to `enrich: true`, which joins GTFS static data (lat/lon, route names). Use `enrich: false` if GTFS isn't imported or you don't need it.
 - **`mode` parameter**: Bus methods default to `mode: "BUS"`. Pass `"HBLR"`, `"NLR"`, `"RL"`, or `"ALL"` for light rail.
 - **`stops_nearby` radius**: The radius parameter is in **feet**, not miles.
-- **Token store**: Auth tokens go through a pluggable `token_store` (`lib/njtransit/token_stores.rb`): any object with `read`/`write`/`delete`, such as `TokenStores::File` or `Rails.cache`. The default is one shared `TokenStores::Memory` per process. Tokens are per API: each GTFS-RT resource (`bus_gtfs`, `bus_gtfs_g2`, `rail_gtfs`) gets its own client via `Client#api_client` with its own auth endpoint, and keys include the auth path. A rejected token (401/403, or a JSON error matching /invalid token/i at any status — NJ Transit uses HTTP 500) is deleted from the store and the request retried once, on both the JSON and raw (GTFS-RT) paths.
+- **Token store**: Auth tokens go through a pluggable `token_store` (`lib/njtransit/token_stores.rb`): any object with `read`/`write`/`delete`, such as `TokenStores::File` or `Rails.cache`. The default is one shared `TokenStores::Memory` per process. Tokens are per API: each GTFS-RT resource (`bus_gtfs`, `bus_gtfs_g2`, `rail_gtfs`) gets its own client via `Client#api_client` with its own auth endpoint, and keys include the auth path. A rejected token (401/403, or a JSON error matching /invalid token/i at any status — NJ Transit uses HTTP 500) is deleted from the store and the request retried once, on both the JSON and raw (GTFS-RT) paths. Renewal (`renew_token!`) is single-flight under a per-token-key `Monitor` shared by every client in the process: the store entry is deleted only if it still holds the rejected token, and a token another thread or client already stored is reused without minting. Cross-process races are not coordinated. `api_client`, `NJTransit.client` and `NJTransit.rail_client` memoize under a lock.
 - **Raw responses**: GTFS-RT methods (`bus_gtfs`, `rail_gtfs`) return binary protobuf data via `post_form_raw`.
 
 ## Testing
 
 ```bash
-bundle exec rspec              # Run all 153 specs
+bundle exec rspec              # Run all specs
 bundle exec rspec spec/file.rb # Run a specific spec file
 ```
 
