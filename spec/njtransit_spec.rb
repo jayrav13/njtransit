@@ -93,4 +93,21 @@ RSpec.describe NJTransit do
       expect(described_class.configuration).not_to be(original_config)
     end
   end
+
+  describe "concurrent first use" do
+    before { described_class.configure { |c| c.username = "u" } }
+    after { described_class.reset! }
+
+    it "builds one client and one rail client" do
+      allow(NJTransit::Client).to receive(:new).and_wrap_original do |original, **kwargs|
+        sleep 0.02
+        original.call(**kwargs)
+      end
+
+      %i[client rail_client].each do |name|
+        clients = Array.new(5) { Thread.new { described_class.public_send(name) } }.map(&:value)
+        expect(clients.uniq(&:object_id).size).to eq(1)
+      end
+    end
+  end
 end

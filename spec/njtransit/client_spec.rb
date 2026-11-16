@@ -433,4 +433,166 @@ RSpec.describe NJTransit::Client do
       expect(sent_tokens).to eq(%w[stale fresh])
     end
   end
+
+  # Plain-Ruby fakes (no rspec doubles) so they are safe to call from many threads.
+  describe "concurrent token rejection on one client" do
+    let(:store) { NJTransit::TokenStores::Memory.new }
+    let(:client) { described_class.new(username: "u", password: "p", token_store: store) }
+    let(:lock) { Mutex.new }
+    let(:mints) { [] }
+    let(:sent) { [] }
+
+    def thread_count = 5
+
+    def response(status, body)
+      Struct.new(:status, :body, :success?).new(status, body, status == 200)
+    end
+
+    # Holds each request that sent the stale token until every thread has sent it, so all are rejected together.
+    def latch
+      waiting = 0
+      cond = ConditionVariable.new
+      lambda do
+        lock.synchronize do
+          waiting += 1
+          cond.broadcast if waiting >= thread_count
+          cond.wait(lock, 1) while waiting < thread_count
+        end
+      end
+    end
+
+    # Answers the auth endpoint (mint) and every request: the stale token is rejected, any other gets `success`.
+    def fake_connection(success)
+      wait = latch
+      fake = Struct.new(:auth_path, :body) { def url(_path) = nil }
+      spec = self
+      Object.new.tap do |conn|
+        conn.define_singleton_method(:post) do |auth_path = nil, &block|
+          req = fake.new(auth_path)
+          block.call(req)
+          auth_path ? spec.mint : spec.answer(req.body[:token], success, wait)
+        end
+      end
+    end
+
+    def answer(token, success, wait)
+      lock.synchronize { sent << token }
+      return success unless token == "stale"
+
+      wait.call
+      response(500, '{"errorMessage":"Invalid token."}')
+    end
+
+    def mint
+      count = lock.synchronize { mints << :mint }.size
+      sleep 0.05 # widen the window in which other threads also handle their rejection
+      response(200, %({"Authenticated": "True", "UserToken": "fresh#{count}"}))
+    end
+
+    def run_threads(&)
+      Array.new(thread_count) { Thread.new(&) }.map(&:value)
+    end
+
+    before { store.write(client.token_key, "stale") }
+
+    context "with GTFS-RT feeds (the raw path)" do
+      before do
+        conn = fake_connection(response(200, "\x0A\x0Dprotobuf"))
+        client.define_singleton_method(:form_connection) { conn }
+        client.define_singleton_method(:raw_connection) { conn }
+      end
+
+      it "mints exactly one token and retries every request with it" do
+        results = run_threads { client.post_form_raw("/api/GTFSRT/getTripUpdates") }
+
+        expect(results).to all(eq("\x0A\x0Dprotobuf"))
+        expect(mints.size).to eq(1)
+        expect(sent.tally).to eq("stale" => thread_count, "fresh1" => thread_count)
+        expect(store.read(client.token_key)).to eq("fresh1")
+      end
+    end
+
+    context "with JSON form requests" do
+      before do
+        conn = fake_connection(response(200, '[{"ok": true}]'))
+        client.define_singleton_method(:form_connection) { conn }
+      end
+
+      it "mints exactly one token and retries every request with it" do
+        results = run_threads { client.post_form("/api/BUSDV2/getRoutes", token: client.token) }
+
+        expect(results).to all(eq([{ "ok" => true }]))
+        expect(mints.size).to eq(1)
+        expect(sent.tally).to eq("stale" => thread_count, "fresh1" => thread_count)
+      end
+    end
+  end
+
+  describe "a rejected token that was already replaced" do
+    let(:store) { NJTransit::TokenStores::Memory.new }
+    let(:client) { described_class.new(username: "u", password: "p", token_store: store) }
+    let(:sent_tokens) { [] }
+    let(:form_connection) { instance_double(Faraday::Connection) }
+
+    def response(body, status: 200)
+      instance_double(Faraday::Response, success?: status == 200, status: status, body: body)
+    end
+
+    # The first request is rejected; `on_reject` simulates what other threads or clients did meanwhile.
+    def stub_feed(&on_reject)
+      raw_connection = instance_double(Faraday::Connection)
+      allow(client).to receive_messages(raw_connection: raw_connection, form_connection: form_connection)
+      allow(form_connection).to receive(:post)
+      allow(raw_connection).to receive(:post) { |&block| feed_response(block, on_reject) }
+    end
+
+    def feed_response(block, on_reject)
+      req = double(url: nil)
+      allow(req).to receive(:body=) { |params| sent_tokens << params[:token] }
+      block.call(req)
+      return response("\x0A\x0Dprotobuf") if sent_tokens.size > 1
+
+      on_reject.call
+      response('{"errorMessage":"Invalid token."}', status: 500)
+    end
+
+    before do
+      store.write(client.token_key, "stale")
+      client.token
+    end
+
+    it "retries with the token another thread on this client minted, without minting or deleting it" do
+      stub_feed do
+        client.instance_variable_set(:@token, "fresh")
+        store.write(client.token_key, "fresh")
+      end
+
+      expect(client.post_form_raw("/api/GTFSRT/getTripUpdates")).to eq("\x0A\x0Dprotobuf")
+      expect(sent_tokens).to eq(%w[stale fresh])
+      expect(form_connection).not_to have_received(:post)
+      expect(store.read(client.token_key)).to eq("fresh")
+    end
+
+    it "adopts a newer token another client stored, without minting or deleting it" do
+      stub_feed { store.write(client.token_key, "from_elsewhere") }
+
+      expect(client.post_form_raw("/api/GTFSRT/getTripUpdates")).to eq("\x0A\x0Dprotobuf")
+      expect(sent_tokens).to eq(%w[stale from_elsewhere])
+      expect(form_connection).not_to have_received(:post)
+      expect(store.read(client.token_key)).to eq("from_elsewhere")
+    end
+  end
+
+  describe "#api_client under concurrent first use" do
+    it "returns one shared client per auth path" do
+      parent = described_class.new(username: "u", password: "p")
+      allow(described_class).to receive(:new).and_wrap_original do |original, **kwargs|
+        sleep 0.02
+        original.call(**kwargs)
+      end
+
+      clients = Array.new(5) { Thread.new { parent.api_client(described_class::GTFS_G2_AUTH_PATH) } }.map(&:value)
+      expect(clients.uniq(&:object_id).size).to eq(1)
+    end
+  end
 end
